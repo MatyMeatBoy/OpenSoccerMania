@@ -19,6 +19,8 @@ static SimulationStep original_step;
 static SimulationStep original_interpolation;
 static bool smooth_interpolation=true,interpolation_hook_active=false;
 static char engine_config[MAX_PATH];
+static bool isolated_camera_probe=false;
+static float probe_camera_pitch=999.f;
 static unsigned long long interpolation_frames=0,interpolation_boundary_frames=0;
 static unsigned long long interpolation_rewinds=0;
 static float previous_interpolation_tick=-1,previous_interpolation_alpha=0;
@@ -74,13 +76,20 @@ static int __cdecl camera_build(void* output,void* camera) {
         auto* fov=reinterpret_cast<int*>(static_cast<unsigned char*>(camera)+0x24);
         if(std::isfinite(*aspect)&&*aspect>.3f&&*aspect<8.f) {
             const float saved_aspect=*aspect;const int saved_fov=*fov;
+            auto* lens=reinterpret_cast<float*>(camera);
+            const float saved_target_z=lens[5];
+            if(isolated_camera_probe&&probe_camera_pitch>=-80.f&&probe_camera_pitch<=80.f) {
+                const float dx=lens[3]-lens[0],dy=lens[4]-lens[1];
+                const float distance=std::sqrt(dx*dx+dy*dy);
+                if(std::isfinite(distance)&&distance>1.f)lens[5]=lens[2]+distance*std::tan(probe_camera_pitch*3.14159265358979323846f/180.f);
+            }
             *fov=horplus_fov(saved_fov,saved_aspect,engine_aspect);*aspect=engine_aspect;
             static bool reported=false;
             if(!reported){FILE* file=std::fopen(engine_log,"a");if(file){std::fprintf(file,"CAMERA_HORPLUS original_fov=%d original_aspect=%.6f output_fov=%d output_aspect=%.6f\n",saved_fov,saved_aspect,*fov,*aspect);std::fclose(file);}reported=true;}
             const int result=original_camera(output,camera);
             // The original builder copies the corrected camera into its active global
             // before returning. Restore the source lens to prevent cumulative expansion.
-            *aspect=saved_aspect;*fov=saved_fov;
+            *aspect=saved_aspect;*fov=saved_fov;lens[5]=saved_target_z;
             return result;
         }
     }
@@ -114,11 +123,17 @@ static void engine_report() {
         interpolation_frames=interpolation_boundary_frames=interpolation_rewinds=0;
         smooth_interpolation=GetPrivateProfileIntA("Graphics","SmoothInterpolation",1,engine_config)!=0;
     }
+    if(isolated_camera_probe) {
+        char pitch[32];GetPrivateProfileStringA("Diagnostics","ProbeCameraPitch","999",pitch,sizeof(pitch),engine_config);
+        const float value=std::strtof(pitch,nullptr);
+        if(value!=probe_camera_pitch){probe_camera_pitch=value;file=std::fopen(engine_log,"a");if(file){std::fprintf(file,"CAMERA_PROBE pitch_degrees=%.3f (isolated test only)\n",value);std::fclose(file);}}
+    }
     report_time=now;simulation_steps=delta_calls=0;
 }
 static void start_engine_hooks(const char* directory,const char* config) {
     std::snprintf(engine_log,MAX_PATH,"%sopensoccermania-engine.log",directory);
     std::snprintf(engine_config,MAX_PATH,"%s",config);
+    isolated_camera_probe=GetPrivateProfileIntA("Diagnostics","IsolateInstance",0,config)!=0;
     if(!GetPrivateProfileIntA("Graphics","VerifiedExecutable",0,config))return;
     auto* base=reinterpret_cast<unsigned char*>(GetModuleHandleA(nullptr));
     const unsigned char advance_signature[]={0x56,0x8b,0x74,0x24,0x08,0x8d,0x46,0x18};

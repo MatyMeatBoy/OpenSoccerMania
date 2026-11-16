@@ -37,6 +37,14 @@ OptiPort reference: `MatyMeatBoy/OptiPort`, main commit `9673006504bf6712b320da7
 - Eight native checks pass, including endpoint continuity, tick-boundary progression, differently sized snapshot records and unchanged input banks. Python checks and native bridge build pass. Full visual acceptance of all animation blends/effects remains pending. See [animation investigation](animation-interpolation.md).
 - GitHub's first CI run exposed a test-path alias mismatch (`RUNNER~1` versus `runneradmin`), not a discovery failure. The installer-tree assertion now compares canonical paths on both sides.
 
+### Replay sky and current priorities
+
+- Reporter confirms that skies and animations look substantially better, while identifying remaining goal-net/shadow clipping and a bad camera transition after goals. Original apparent zoom must remain the default; distant zooms belong in experimental settings.
+- A live pirate-map sky trace crossed the horizon with signed RHW. GPU tests showed that depth normalization alone still clips negative W. A signed projected-texture path now preserves raster coverage and texture perspective; GPU regressions pass through buffered and immediate indexed/non-indexed paths.
+- A second low-angle trace crossed the far-depth boundary (`0.9998924`–`1.0001178`). Its black-output regression fails before the widened background predicate and passes afterward. Color-only backgrounds also have a reproduced/passing GPU regression.
+- Private input-desktop state stayed unchanged throughout testing. Two bounded match probes exited cleanly after their own close requests; other probe states still require forced termination, so clean shutdown is not universally accepted.
+- Next scope is recorded in [modernization follow-up](modernization-next.md): original-zoom camera/goal transitions, world-effect framing, F1 / Start+Select internal settings, controller prompts, broader image intake and selectable Soccer/Football title branding.
+
 - Measure a controlled match with VSync off and distinguish CPU/render/presentation waits. Do not publish gains from different matches or changed quality settings.
 - Compare real match timer, motion, power-ups and audio at multiple render caps with the original scheduler.
 - Validate resize/maximize, 4:3, 16:9, ultrawide and movie transitions; exercise device reset and clean shutdown.

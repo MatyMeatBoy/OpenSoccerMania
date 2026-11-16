@@ -6,7 +6,8 @@
 - Add a smooth-interpolation graphics option, version-checked animation diagnostics and a corrected SA-state sampler.
 - Add a native regression for interpolation continuity and snapshot-bank strides.
 - Compare canonical installer paths in tests so Windows 8.3 TEMP aliases work on GitHub runners.
-- Remaining reported issue: a horizontal black sky/horizon band in some replay cameras is under investigation.
+- Correct signed-RHW horizon clipping while preserving sky texture perspective; handle color-only backgrounds and layers straddling the far-depth boundary. GPU regressions cover five buffered/immediate draw paths and restoration of graphics state.
+- Remaining reported issues: goal-net/shadow clipping at the original frame, apparent camera zoom and camera transitions after goals. All-map/replay visual acceptance remains open.
 
 ## 0.1.0-pre.1 — 2026-11-16
 

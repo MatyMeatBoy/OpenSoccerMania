@@ -12,6 +12,10 @@ int main() {
     assert(!osm::overlay_depth(1.0015f,0.00002f)); // captured sky vertices
     assert(!osm::overlay_depth(.9f,.01f)); // projected scene geometry
     assert(osm::background_depth(1.0015f,.00002f));
+    assert(osm::background_depth(1.0017704f,-.000011315f));
+    assert(osm::background_depth(.9998924f,.000115797f));
+    assert(!osm::background_depth(1.0015f,0));
+    assert(!osm::background_depth(1.0015f,NAN));
     assert(!osm::background_depth(.9f,.00002f));
     assert(!osm::background_depth(1.0015f,1.f));
     assert(std::fabs(osm::raster_coordinate(-.5f,3.f,0)+.5f)<.0001f);

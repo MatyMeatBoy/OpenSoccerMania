@@ -139,6 +139,7 @@ static unsigned capture_sky_layer=0;
 static bool trace_screen_vertices=false;
 static bool live_sprite_diagnostics=false;
 static unsigned sprite_fix_mode=0;
+static void capture_screen_layer(IDirect3DDevice8*,const void*,UINT,UINT,DWORD,bool,bool);
 static void capture_backbuffer(IDirect3DDevice8* device,const char* tag="frame") {
     IDirect3DSurface8 *source=nullptr,*copy=nullptr;
     HRESULT status=IDirect3DDevice8_GetBackBuffer(device,0,D3DBACKBUFFER_TYPE_MONO,&source);
@@ -477,6 +478,48 @@ struct DrawAdjustment {
     ~DrawAdjustment(){if(constants_changed)real_shader_constant(device,0,constants,1);if(viewport_changed)original_set_viewport(device,&viewport);if(multisample_changed)IDirect3DDevice8_SetRenderState(device,D3DRS_MULTISAMPLEANTIALIAS,multisample);if(fog_changed)IDirect3DDevice8_SetRenderState(device,D3DRS_FOGENABLE,fog);for(unsigned i=0;i<4;++i)if(stage_changed[i])IDirect3DDevice8_SetTextureStageState(device,0,stage_types[i],stage_values[i]);}
 };
 
+// Legacy pretransformed sky geometry can cross the projection horizon and
+// contain signed RHW. D3D11 clips negative homogeneous W, unlike the intended
+// already-projected raster. Keep raster W positive and carry signed perspective
+// in projected texture coordinates instead: (u*rhw,v*rhw,rhw).
+struct SkyProjectiveCopy {
+    IDirect3DDevice8* device;
+    std::vector<unsigned char> vertices;
+    DWORD shader=0,flags=0;D3DMATRIX matrix={};
+    bool changed_shader=false,changed_flags=false,changed_matrix=false;
+    UINT stride=0;
+    explicit SkyProjectiveCopy(IDirect3DDevice8* value,const void* data,UINT count,UINT source_stride,bool background):device(value) {
+        if(!background||!data||!count||source_stride<16||FAILED(current_shader(device,&shader)))return;
+        bool signed_rhw=false;
+        for(UINT i=0;i<count;++i){float q;std::memcpy(&q,static_cast<const BYTE*>(data)+i*source_stride+12,4);if(q<0)signed_rhw=true;}
+        if(!signed_rhw)return;
+        const bool textured=shader==0x1c4&&source_stride>=32;
+        const bool colored=shader==0x44&&source_stride>=20;
+        if(!textured&&!colored)return;
+        stride=textured?36:source_stride;
+        vertices.resize(static_cast<size_t>(count)*stride);
+        for(UINT i=0;i<count;++i) {
+            auto* target=vertices.data()+static_cast<size_t>(i)*stride;
+            const auto* source=static_cast<const BYTE*>(data)+static_cast<size_t>(i)*source_stride;
+            std::memcpy(target,source,textured?24:source_stride);
+            const float one=1;std::memcpy(target+12,&one,4);
+            if(textured){float uv[2],q;std::memcpy(uv,source+24,8);std::memcpy(&q,source+12,4);float projected[3]={uv[0]*q,uv[1]*q,q};std::memcpy(target+24,projected,12);}
+        }
+        if(textured) {
+            if(FAILED(IDirect3DDevice8_GetTextureStageState(device,0,D3DTSS_TEXTURETRANSFORMFLAGS,&flags))||FAILED(IDirect3DDevice8_GetTransform(device,D3DTS_TEXTURE0,&matrix))){vertices.clear();return;}
+            D3DMATRIX identity={};identity._11=identity._22=identity._33=identity._44=1;
+            changed_matrix=SUCCEEDED(IDirect3DDevice8_SetTransform(device,D3DTS_TEXTURE0,&identity));
+            if(changed_matrix)changed_flags=SUCCEEDED(IDirect3DDevice8_SetTextureStageState(device,0,D3DTSS_TEXTURETRANSFORMFLAGS,D3DTTFF_COUNT3|D3DTTFF_PROJECTED));
+            if(changed_flags)changed_shader=SUCCEEDED(IDirect3DDevice8_SetVertexShader(device,shader|D3DFVF_TEXCOORDSIZE3(0)));
+            if(!changed_shader){restore();vertices.clear();}
+        }
+    }
+    void restore(){if(changed_shader)IDirect3DDevice8_SetVertexShader(device,shader);if(changed_flags)IDirect3DDevice8_SetTextureStageState(device,0,D3DTSS_TEXTURETRANSFORMFLAGS,flags);if(changed_matrix)IDirect3DDevice8_SetTransform(device,D3DTS_TEXTURE0,&matrix);changed_shader=changed_flags=changed_matrix=false;}
+    ~SkyProjectiveCopy(){restore();}
+    const void* data(const void* original)const{return vertices.empty()?original:vertices.data();}
+    UINT vertex_stride(UINT original)const{return vertices.empty()?original:stride;}
+};
+
 static HRESULT WINAPI shader_constant(IDirect3DDevice8* device,DWORD first,const void* data,DWORD count) {
     if(first<=95&&first+count>95)correction_dirty=true;
     if(data && constant_calls++<24) {
@@ -601,7 +644,7 @@ static bool copy_hud(IDirect3DDevice8* device,const void* data,UINT vertices,UIN
     if(hud)for(UINT i=0;i<vertices&&hud;++i){float z,rhw;const auto* bytes=static_cast<const unsigned char*>(data)+i*stride;std::memcpy(&z,bytes+8,4);std::memcpy(&rhw,bytes+12,4);hud=osm::overlay_depth(z,rhw);}
     if(flat)*flat=hud;
     DWORD depth_enabled=TRUE;
-    bool background=fvf==0x1c4&&SUCCEEDED(IDirect3DDevice8_GetRenderState(device,D3DRS_ZENABLE,&depth_enabled))&&!depth_enabled;
+    bool background=!hud&&SUCCEEDED(IDirect3DDevice8_GetRenderState(device,D3DRS_ZENABLE,&depth_enabled))&&!depth_enabled;
     if(background)for(UINT i=0;i<vertices&&background;++i){float z,rhw;const auto* bytes=static_cast<const unsigned char*>(data)+i*stride;std::memcpy(&z,bytes+8,4);std::memcpy(&rhw,bytes+12,4);background=osm::background_depth(z,rhw);}
     if(background_layer)*background_layer=background;
     const size_t length=static_cast<size_t>(vertices)*stride;
@@ -653,7 +696,11 @@ static HRESULT WINAPI draw_up(IDirect3DDevice8* device,D3DPRIMITIVETYPE type,UIN
     if(up_draws<=3){DWORD fvf=0;IDirect3DDevice8_GetVertexShader(device,&fvf);FILE* file=std::fopen(log_path,"a");if(file){std::fprintf(file,"draw_up fvf=%lx stride=%u\n",fvf,stride);std::fclose(file);}}
     const UINT vertices=count<=100000?vertex_count(type,count):0;
     if(vertices && copy_hud(device,data,vertices,stride,copy,true,&flat,&background))data=copy.data();
-    DrawAdjustment adjustment(device,flat,background);return real_draw_up(device,type,count,data,stride);
+    DrawAdjustment adjustment(device,flat,background);
+    SkyProjectiveCopy projective(device,data,vertices,stride,background);
+    const HRESULT result=real_draw_up(device,type,count,projective.data(data),projective.vertex_stride(stride));
+    if(capture_sky_pending&&!copy.empty()){DWORD fvf=0;current_shader(device,&fvf);capture_screen_layer(device,data,vertices,stride,fvf,flat,background);}
+    return result;
 }
 
 static HRESULT WINAPI draw_indexed_up(IDirect3DDevice8* device,D3DPRIMITIVETYPE type,UINT minimum,UINT vertices,UINT count,const void* indices,D3DFORMAT format,const void* data,UINT stride) {
@@ -661,7 +708,9 @@ static HRESULT WINAPI draw_indexed_up(IDirect3DDevice8* device,D3DPRIMITIVETYPE 
     bool flat=false,background=false;
     // Include the leading vertices referenced by min_vertex_idx; leave all indices intact.
     if(minimum<=100000 && vertices<=100000-minimum && copy_hud(device,data,minimum+vertices,stride,copy,true,&flat,&background))data=copy.data();
-    DrawAdjustment adjustment(device,flat,background);return real_draw_indexed_up(device,type,minimum,vertices,count,indices,format,data,stride);
+    DrawAdjustment adjustment(device,flat,background);
+    SkyProjectiveCopy projective(device,data,minimum+vertices,stride,background);
+    return real_draw_indexed_up(device,type,minimum,vertices,count,indices,format,projective.data(data),projective.vertex_stride(stride));
 }
 
 struct ScreenBufferCopy {
@@ -708,23 +757,31 @@ struct ScreenBufferCopy {
     void restore(){IDirect3DDevice8_SetStreamSource(device,0,buffer,stride);}
 };
 
-static void capture_sky_layer_after_draw(IDirect3DDevice8* device,const ScreenBufferCopy& screen) {
-    if(!capture_sky_pending||screen.flat||screen.format!=0x1c4)return;
+static void capture_screen_layer(IDirect3DDevice8* device,const void* vertices,UINT count,UINT stride,DWORD format,bool flat,bool background) {
+    if(!capture_sky_pending||flat||!vertices||!count||stride<16||!screen_format(format))return;
     char tag[32];std::snprintf(tag,sizeof(tag),"sky-layer-%u",++capture_sky_layer);
-    const bool ended=SUCCEEDED(IDirect3DDevice8_EndScene(device));
-    capture_backbuffer(device,tag);
-    if(ended)IDirect3DDevice8_BeginScene(device);
+    if(capture_sky_layer<=6) {
+        const bool ended=SUCCEEDED(IDirect3DDevice8_EndScene(device));
+        capture_backbuffer(device,tag);
+        if(ended)IDirect3DDevice8_BeginScene(device);
+    }
     FILE* file=std::fopen(log_path,"a");
     if(file) {
-        std::fprintf(file,"SKY_LAYER frame=%lu layer=%u",presents,capture_sky_layer);
-        if(screen.vertices.size()>=24){DWORD diffuse=0,specular=0;std::memcpy(&diffuse,screen.vertices.data()+16,4);std::memcpy(&specular,screen.vertices.data()+20,4);std::fprintf(file," diffuse=%08lx specular=%08lx",diffuse,specular);}
+        std::fprintf(file,"SKY_LAYER frame=%lu layer=%u fvf=%lx vertices=%u background=%d",presents,capture_sky_layer,format,count,background);
+        float low[4]={INFINITY,INFINITY,INFINITY,INFINITY},high[4]={-INFINITY,-INFINITY,-INFINITY,-INFINITY};
+        for(UINT i=0;i<count;++i)for(UINT j=0;j<4;++j){float value;std::memcpy(&value,static_cast<const BYTE*>(vertices)+i*stride+j*4,4);low[j]=std::min(low[j],value);high[j]=std::max(high[j],value);}
+        std::fprintf(file," x=%.3f:%.3f y=%.3f:%.3f z=%.7f:%.7f rhw=%.9f:%.9f",low[0],high[0],low[1],high[1],low[2],high[2],low[3],high[3]);
+        if(stride>=24){DWORD diffuse=0,specular=0;std::memcpy(&diffuse,static_cast<const BYTE*>(vertices)+16,4);std::memcpy(&specular,static_cast<const BYTE*>(vertices)+20,4);std::fprintf(file," diffuse=%08lx specular=%08lx",diffuse,specular);}
         for(auto type:{D3DRS_ZENABLE,D3DRS_FOGENABLE,D3DRS_ALPHABLENDENABLE,D3DRS_SRCBLEND,D3DRS_DESTBLEND,D3DRS_FOGTABLEMODE,D3DRS_FOGVERTEXMODE,D3DRS_CLIPPING}){DWORD value=0;IDirect3DDevice8_GetRenderState(device,type,&value);std::fprintf(file," rs%u=%lx",type,value);}
         for(auto type:{D3DTSS_COLOROP,D3DTSS_COLORARG1,D3DTSS_COLORARG2,D3DTSS_ALPHAOP,D3DTSS_ALPHAARG1,D3DTSS_ADDRESSU,D3DTSS_ADDRESSV}){DWORD value=0;IDirect3DDevice8_GetTextureStageState(device,0,type,&value);std::fprintf(file," ts%u=%lx",type,value);}
         IDirect3DBaseTexture8* texture=nullptr;IDirect3DDevice8_GetTexture(device,0,&texture);
         if(texture){if(IDirect3DBaseTexture8_GetType(texture)==D3DRTYPE_TEXTURE){D3DSURFACE_DESC desc={};IDirect3DTexture8_GetLevelDesc(reinterpret_cast<IDirect3DTexture8*>(texture),0,&desc);std::fprintf(file," texture=%ux%u format=%u",desc.Width,desc.Height,desc.Format);}IDirect3DBaseTexture8_Release(texture);}
         std::fputc('\n',file);std::fclose(file);
     }
-    if(capture_sky_layer>=3)capture_sky_pending=false;
+    if(capture_sky_layer>=16)capture_sky_pending=false;
+}
+static void capture_sky_layer_after_draw(IDirect3DDevice8* device,const ScreenBufferCopy& screen) {
+    if(!screen.vertices.empty())capture_screen_layer(device,screen.vertices.data(),static_cast<UINT>(screen.vertices.size()/screen.stride),screen.stride,screen.format,screen.flat,screen.background);
 }
 
 static HRESULT WINAPI draw(IDirect3DDevice8* device,D3DPRIMITIVETYPE type,UINT start,UINT count) {
@@ -732,7 +789,8 @@ static HRESULT WINAPI draw(IDirect3DDevice8* device,D3DPRIMITIVETYPE type,UINT s
     ScreenBufferCopy screen(device);
     if(count<=33333&&screen.prepare(start,vertex_count(type,count))) {
         DrawAdjustment adjustment(device,screen.flat,screen.background);
-        const HRESULT result=real_draw_up(device,type,count,screen.vertices.data(),screen.stride);
+        SkyProjectiveCopy projective(device,screen.vertices.data(),vertex_count(type,count),screen.stride,screen.background);
+        const HRESULT result=real_draw_up(device,type,count,projective.data(screen.vertices.data()),projective.vertex_stride(screen.stride));
         capture_sky_layer_after_draw(device,screen);
         screen.restore();return result;
     }
@@ -768,7 +826,8 @@ static HRESULT WINAPI draw_indexed(IDirect3DDevice8* device,D3DPRIMITIVETYPE typ
                     if(locked)IDirect3DIndexBuffer8_Unlock(indices);
                     if(valid) {
                         DrawAdjustment adjustment(device,screen.flat,screen.background);
-                        const HRESULT result=real_draw_indexed_up(device,type,0,vertices,count,rebased.data(),desc.Format,screen.vertices.data(),screen.stride);
+                        SkyProjectiveCopy projective(device,screen.vertices.data(),vertices,screen.stride,screen.background);
+                        const HRESULT result=real_draw_indexed_up(device,type,0,vertices,count,rebased.data(),desc.Format,projective.data(screen.vertices.data()),projective.vertex_stride(screen.stride));
                         capture_sky_layer_after_draw(device,screen);
                         screen.restore();IDirect3DDevice8_SetIndices(device,indices,base);IDirect3DIndexBuffer8_Release(indices);return result;
                     }

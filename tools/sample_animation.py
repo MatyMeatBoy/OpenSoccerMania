@@ -62,7 +62,7 @@ def sample(pid,duration,output):
             time.sleep(.002)
         result={'pid':pid,'executable':str(executable),'samples':records}
         output=Path(output);output.parent.mkdir(parents=True,exist_ok=True);output.write_text(json.dumps(result,indent=2))
-        print(json.dumps({'samples':len(records),'actors':records[-1]['count'] if records else 0,'first_sample':records[0] if records else None},indent=2))
+        print(json.dumps({'samples':len(records),'actors':records[-1]['count'] if records else 0,'output':str(output)}))
     finally:kernel.CloseHandle(handle)
 
 
