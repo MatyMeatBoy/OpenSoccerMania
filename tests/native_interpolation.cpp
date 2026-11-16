@@ -4,6 +4,15 @@
 #include <limits>
 #include <initializer_list>
 struct Pose {float x;unsigned words;};
+struct CameraPose {float aspect,up,position;};
+static int blend_camera(void* object,void* current,void* previous,float alpha) {
+    auto* out=static_cast<CameraPose*>(object);
+    const auto a=*static_cast<CameraPose*>(current),b=*static_cast<CameraPose*>(previous);
+    out->aspect=b.aspect+(a.aspect-b.aspect)*alpha;
+    out->up=b.up+(a.up-b.up)*alpha;
+    out->position=b.position+(a.position-b.position)*alpha;
+    return sizeof(CameraPose)/4;
+}
 static int blend(void* object,void* current,void* previous,float alpha) {
     auto* pose=static_cast<Pose*>(object);float a,b;
     std::memcpy(&a,current,4);std::memcpy(&b,previous,4);
@@ -29,4 +38,30 @@ int main() {
     assert(a.x==20);
     assert(!osm::valid_interpolation_fraction(-.1f));
     assert(!osm::valid_interpolation_fraction(std::numeric_limits<float>::quiet_NaN()));
+    // At match startup only the current bank has been saved. Rendering alpha
+    // zero used to copy the uninitialized previous camera into the source; the
+    // next simulation save then made its zero aspect/up permanent history.
+    CameraPose camera{4.f/3,1,20},newer=camera,older{};
+    osm::InterpolationNode camera_node{&camera,nullptr,blend_camera,nullptr};
+    auto* new_bytes=reinterpret_cast<unsigned char*>(&newer);
+    auto* old_bytes=reinterpret_cast<unsigned char*>(&older);
+    osm::SnapshotHistory history;history.reset();
+    assert(!history.prime(nullptr,old_bytes,sizeof(camera)));
+    assert(!history.prime(new_bytes,new_bytes,sizeof(camera)));
+    assert(history.prime(new_bytes,old_bytes,sizeof(camera)));
+    for(float alpha:{0.f,.01f,.05f,.4f,.9f,1.f}) {
+        assert(osm::interpolate_snapshots(&camera_node,new_bytes,old_bytes,alpha));
+        assert(camera.aspect==4.f/3&&camera.up==1&&camera.position==20);
+    }
+    // Subsequent saves retain distinct endpoints and still interpolate motion.
+    newer.position=40;
+    assert(!history.prime(new_bytes,old_bytes,sizeof(camera)));
+    assert(osm::interpolate_snapshots(&camera_node,new_bytes,old_bytes,.25f));
+    assert(camera.aspect==4.f/3&&camera.up==1&&camera.position==25);
+    // Reallocation for another match must seed even if allocation addresses
+    // are reused. No remembered pointer identity substitutes for this reset.
+    history.reset();newer={4.f/3,1,100};
+    assert(history.prime(new_bytes,old_bytes,sizeof(camera)));
+    assert(osm::interpolate_snapshots(&camera_node,new_bytes,old_bytes,0));
+    assert(camera.aspect==4.f/3&&camera.up==1&&camera.position==100);
 }

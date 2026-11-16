@@ -4,8 +4,10 @@ import configparser
 import hashlib
 import io
 import shutil
+import logging
 from .sources import child
 from .patches import apply_patch, portable_startup, SUPPORTED_HASHES, SUPPORTED_RUNTIME_HASHES
+from .video import CAMERA_ZOOMS,RENDER_LIMITS
 
 
 def setup_portable(entry, original_hash):
@@ -55,10 +57,51 @@ def configure_bridge(entry,settings):
     config['Graphics']['SpriteSeamFix']='7' if settings.sprite_seam_fix else '0'
     config['Graphics']['VSync']=str(int(settings.vsync))
     config['Graphics']['SmoothInterpolation']=str(int(settings.smooth_interpolation))
+    config['Graphics']['CameraZoom']=str(CAMERA_ZOOMS.index(settings.camera_zoom))
+    config['Graphics']['XboxPrompts']=str(int(settings.xbox_prompts))
+    config['Graphics']['TitleExtension']=str(int(settings.title_extension))
     config['Game']={'Language':getattr(settings,'language','English').upper()}
+    config['Game']['Edition']='SOCCER' if settings.edition=='Soccer Mania' else 'FOOTBALL'
+    root=Path(__file__).resolve().parents[1]
+    config['UI']={'FontPath':str(root/'assets/fonts/Nunito.ttf') if str(root).isascii() else ''}
+    if settings.title_extension:
+        from .title_assets import TitleAssetError
+        from .title_presentation import prepare_title_presentation
+        try:
+            title=prepare_title_presentation(entry,'soccer' if settings.edition=='Soccer Mania' else 'football',root/'assets/backgrounds/title-extension.png',Path(entry)/'opensoccermania-title')
+            config['UI']['TitleBackgroundPath']=Path(title['backgroundBmp']).relative_to(Path(entry).resolve()).as_posix()
+            config['UI']['TitleCenterLeft']=str(title['centerRect'][0])
+            config['UI']['TitleCenterRight']=str(title['centerRect'][2])
+        except (OSError,ValueError,TitleAssetError) as error:
+            logging.getLogger('opensoccermania').warning('Title extension unavailable; preserving original presentation: %s',error)
     out=io.StringIO();config.write(out)
     path=Path(entry)/'opensoccermania.ini'
     temporary=path.with_suffix('.tmp');temporary.write_text(out.getvalue(),encoding='ascii');temporary.replace(path)
+
+
+def read_live_settings(entry,settings):
+    """Read only validated options changed by the native panel; preserve others."""
+    from dataclasses import replace
+    config=configparser.ConfigParser(interpolation=None)
+    try:config.read(Path(entry)/'opensoccermania.ini',encoding='ascii')
+    except (OSError,ValueError,configparser.Error):return settings
+    if not config.has_section('Graphics'):return settings
+    values={}
+    for key,field in [('PerformanceHud','performance_hud'),('SmoothInterpolation','smooth_interpolation'),('XboxPrompts','xbox_prompts')]:
+        try:
+            value=config.getint('Graphics',key)
+            if value in (0,1):values[field]=bool(value)
+        except (ValueError,configparser.Error):pass
+    for key,field,allowed in [('OverlayScale','overlay_scale',[75,100,125,150,175,200]),('RenderFPS','render_fps',list(RENDER_LIMITS.values()))]:
+        try:
+            value=config.getint('Graphics',key)
+            if value in allowed:values[field]=value
+        except (ValueError,configparser.Error):pass
+    try:
+        zoom=config.getint('Graphics','CameraZoom')
+        if 0<=zoom<len(CAMERA_ZOOMS):values['camera_zoom']=CAMERA_ZOOMS[zoom]
+    except (ValueError,configparser.Error):pass
+    return replace(settings,**values)
 
 
 def install_input_bridge(entry, bridge):

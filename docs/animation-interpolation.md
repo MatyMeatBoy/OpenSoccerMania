@@ -23,3 +23,15 @@ The launcher exposes **Smooth animation interpolation at high FPS**. `Graphics.S
 The native regression reproduces the legacy endpoint rewind, checks monotonic progress through zero and the 0.05 boundary, crosses a tick boundary, exercises differently sized snapshot records and verifies that endpoint buffers remain unchanged. Live A/B results are recorded in the work board after validation.
 
 This fixes the identified interpolation mechanism. It does not certify every character, cinematic, map, animation blend or procedural effect. A reporter visual check remains distinct from local counter and regression results.
+
+## First snapshot history and camera zoom
+
+A separate isolated A/B trace identified a startup defect exposed by independent rendering. The allocator at `0x41f7c0` creates both snapshot banks without initializing their contents. The complete save at `0x41fca0` fills only the selected bank. At the first match render, the current camera snapshot contained aspect `1.333333373` and up-Z `1`, while the previous snapshot contained zeros. Interpolating with fraction zero wrote those zeros into the source camera. The next logic save then preserved the corrupted values. The main camera controller refreshes position, target and FOV each tick, but leaves aspect and up unchanged, allowing the error to persist.
+
+This caused nondeterministic zoom changes without changing camera distance: one traced run settled at up-Z `0.4160546` and source aspect about `0.5547394`. Its controller FOV remained `512`, but the horizontal extension used output FOV `1189` instead of the expected `656`. Another startup settled at different values, depending on its initial render fractions.
+
+The fix seeds the previous bank from the **first complete current-bank save after each allocation**, before interpolation can read it. Subsequent saves keep their distinct endpoints. It does not replace the simulation clock or impose a fixed camera lens. The allocator/save hooks use executable signatures, and the regression covers first-frame interpolation, later motion and a new match reusing the same allocation addresses.
+
+The fixed A/B trace records a 6,211-byte seed between the first save and first blend. Both camera endpoints then contain aspect `1.333333373` and up-Z `1`, including at fraction zero. Across 786 live samples over 20 seconds, these values remained constant and output FOV stayed `656`. Vertical projection scale differed from the original by about 0.06%, from integer FOV rounding. Camera position-change diagnostics and within-tick rewinds were zero; the authoritative simulation remained configured at 50 Hz. Private evidence is recorded in `local/camera-goal-evidence/startup-camera-ab.json`.
+
+This verifies the startup history and resulting zoom corruption fix. The reported goal-to-replay-to-gameplay sequence has not yet been reproduced, so its camera behavior remains a separate verification item.

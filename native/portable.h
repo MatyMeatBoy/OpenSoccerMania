@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <cstdlib>
+#include "edition.h"
 
 namespace osm {
 static char profile_path[MAX_PATH],legacy_ini[MAX_PATH],portable_config[MAX_PATH],game_directory[MAX_PATH];
@@ -35,8 +36,7 @@ static bool legacy_name(LPCSTR name) {
            _strnicmp(name,"Software\\LEGO Media\\Soccer Mania",32)==0;
 }
 static bool selected_legacy_name(LPCSTR name) {
-    char language[32];GetPrivateProfileStringA("Game","Language","ENGLISH",language,sizeof(language),portable_config);
-    const bool american=_stricmp(language,"AMERICAN")==0;
+    const bool american=configured_edition(portable_config)==Edition::Soccer;
     return american?std::strstr(name,"Soccer Mania")!=nullptr:std::strstr(name,"Football Mania")!=nullptr;
 }
 static LSTATUS WINAPI open_registry(HKEY key,LPCSTR name,DWORD options,REGSAM access,PHKEY output) {
@@ -54,6 +54,7 @@ static LSTATUS WINAPI query_registry(HKEY key,LPCSTR name,LPDWORD reserved,LPDWO
     if(_stricmp(name,"Location")==0)bytes.assign(game_directory,game_directory+std::strlen(game_directory)+1);
     if(_stricmp(name,"Language")==0) {
         char language[32];GetPrivateProfileStringA("Game","Language","AUTO",language,sizeof(language),portable_config);
+        if(const char* region=edition_registry_language(portable_config))std::snprintf(language,sizeof(language),"%s",region);
         if(_stricmp(language,"AUTO")!=0)bytes.assign(language,language+std::strlen(language)+1);
     }
     if(bytes.empty()) {

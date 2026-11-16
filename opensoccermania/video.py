@@ -11,6 +11,9 @@ FILTER_MODES = {'Game default': 'appdriven', 'Bilinear': 'bilinear', 'Trilinear'
 DISPLAY_MODES = ['Windowed', 'Borderless', 'Fullscreen']
 RENDER_LIMITS = {'60 FPS':60, '120 FPS':120, '144 FPS':144, '165 FPS':165,
                  '240 FPS':240, '360 FPS':360, '480 FPS':480, 'Unlimited':0}
+CAMERA_ZOOMS = ['Original zoom','Wide view (experimental)','Distant view (experimental)']
+EDITIONS = ['Soccer Mania','Football Mania']
+LANGUAGES = ['American','English','Danish','Dutch','French','German','Italian','Spanish','Swedish']
 
 
 @dataclass
@@ -33,6 +36,11 @@ class VideoSettings:
     sprite_seam_fix: bool = True
     modern_presentation: bool = True
     smooth_interpolation: bool = True
+    camera_zoom: str = 'Original zoom'
+    xbox_prompts: bool = True
+    edition: str = 'Football Mania'
+    language: str = 'English'
+    title_extension: bool = True
 
     @property
     def window_mode(self):
@@ -49,6 +57,8 @@ class VideoSettings:
             raise ValueError('Choose an overlay scale from 75% to 200%.')
         if self.render_fps not in RENDER_LIMITS.values():
             raise ValueError('Choose a supported render FPS limit or Unlimited.')
+        if self.camera_zoom not in CAMERA_ZOOMS or self.edition not in EDITIONS or self.language not in LANGUAGES:
+            raise ValueError('Choose a supported camera preset, edition and language.')
 
 
 def configure_wrapper(text, settings):

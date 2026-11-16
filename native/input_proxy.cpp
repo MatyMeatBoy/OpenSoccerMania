@@ -4,6 +4,8 @@
 #include <dinput.h>
 #include <cstdio>
 #include <cstring>
+#include "ui_state.h"
+#include "hook_chain.h"
 
 using Factory=HRESULT (WINAPI *)(HINSTANCE,DWORD,REFIID,void**,LPUNKNOWN);
 using CreateDevice=HRESULT (WINAPI *)(void*,REFGUID,void**,LPUNKNOWN);
@@ -19,8 +21,15 @@ static HWND game_window=nullptr;
 static HANDLE input_mapping=nullptr;
 static const unsigned char* input_memory=nullptr;
 static bool keyboard_state_logged=false;
+static osm::UiStateReader ui_state;
 static HRESULT WINAPI device_state(void* device,DWORD size,LPVOID data) {
     HRESULT result=original_state(device,size,data);
+    // Poll the real device first, preserving acquisition/focus side effects.
+    // Only recognized keyboard/mouse packet shapes have an all-zero neutral state.
+    if(data && (size==256 || size==sizeof(DIMOUSESTATE) || size==sizeof(DIMOUSESTATE2)) && ui_state.panel_open()) {
+        std::memset(data,0,size);
+        return DI_OK;
+    }
     if(size!=256 || !data)return result;
     if(!keyboard_state_logged){FILE* file=std::fopen(log_path,"a");if(file){std::fprintf(file,"KEYBOARD_STATE bytes=256 result=0x%lx\n",static_cast<unsigned long>(result));std::fclose(file);}keyboard_state_logged=true;}
     if(!input_memory) {
@@ -42,10 +51,10 @@ static HRESULT WINAPI device_state(void* device,DWORD size,LPVOID data) {
 }
 
 static void replace(void** slot,void* replacement,void** original) {
-    if(*slot==replacement)return;
+    if(osm::hook_decision(*slot,replacement,*original)!=osm::HookDecision::Install)return;
     DWORD protection;
     if(VirtualProtect(slot,sizeof(void*),PAGE_READWRITE,&protection)) {
-        *original=*slot;*slot=replacement;
+        if(!*original)*original=*slot;*slot=replacement;
         VirtualProtect(slot,sizeof(void*),protection,&protection);
     }
 }

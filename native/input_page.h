@@ -8,6 +8,16 @@ class PrivateKeyboard {
     ULONGLONG retry_=0;
     bool down_[256]={};
 public:
+    bool background_test_enabled()const {
+        if(!memory_)return false;
+        const auto* words=reinterpret_cast<const volatile DWORD*>(memory_);
+        return words[0]==0x494d534f&&!(words[1]&1)&&(words[2]&3)==3;
+    }
+    bool controller_present()const {
+        if(!memory_)return false;
+        const auto* words=reinterpret_cast<const volatile DWORD*>(memory_);
+        return words[0]==0x494d534f&&!(words[1]&1)&&(words[2]&4);
+    }
     ~PrivateKeyboard(){if(memory_)UnmapViewOfFile(memory_);if(mapping_)CloseHandle(mapping_);}
     SHORT state(int key,bool focused) {
         if(key<0||key>255)return 0;

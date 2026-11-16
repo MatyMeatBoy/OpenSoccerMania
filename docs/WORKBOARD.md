@@ -1,6 +1,7 @@
 # OpenSoccerMania work board
 
-Updated: 2026-11-16. Preparing 0.1.0-pre.1 as a limited public source snapshot; see the release scope.
+Updated: 2026-11-16. Published 0.1.0-pre.1 as a limited public source snapshot;
+subsequent development remains unreleased. See the release scope.
 
 ## Current pass: original clock and independent rendering
 
@@ -18,6 +19,23 @@ OptiPort reference: `MatyMeatBoy/OptiPort`, main commit `9673006504bf6712b320da7
 | Borderless hotkeys | F11 and Alt+Enter added, with foreground-only physical-key polling and held-key suppression. Automated F11 message tests passed in both starting modes, including return to previous window placement and clean exit. Desktop stayed 1536×864; internal target stayed 1920×1080. The backend replaces its window procedure during style changes; the bridge now reinstalls its subclass after that transition. |
 
 ## Remaining acceptance work
+
+### Unreleased integration checks
+
+- Python suite: 60 tests pass, one platform privilege skip. The native suite has
+  13 passing checks, including title BMP validation and hook-chain ownership.
+- Native F1 settings and Start + View/Select transport are implemented. The
+  settings overlay has an isolated GPU check; physical controller acceptance
+  and original in-game button-art replacement remain open.
+- Both regional titles decode privately. Generated blue sidebars preserve the
+  original center and match private edge colors; synthetic GPU checks verify
+  exact center boundaries and restored graphics state. Real title/replay/wipe
+  acceptance remains separate. See [title branding](title-branding.md).
+- Broader image intake, damaged-executable donor repair and private backend
+  reuse have bounded parser/worker tests. Real images of each declared layout
+  remain acceptance work; extension alone never establishes support.
+- A reproduced layered COM Release recursion now has an old-fail/new-pass GPU
+  regression. See [lifecycle evidence](com-hook-lifecycle.md).
 
 ### Current render pass
 

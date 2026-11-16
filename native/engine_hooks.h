@@ -7,6 +7,15 @@ namespace osm {
 static bool camera_hooks_active=false,timing_hooks_active=false;
 static float engine_aspect=16.f/9.f;
 static double render_limit=240;
+static int camera_zoom_index=0;
+static ULONGLONG last_simulation_tick=0;
+static unsigned long long camera_calls=0,camera_position_changes=0;
+static float camera_vertical_min=100,camera_vertical_max=0;
+static void* last_camera_source=nullptr;
+static bool engine_gameplay() {
+    return timing_hooks_active&&last_simulation_tick&&GetTickCount64()-last_simulation_tick<300&&
+        *reinterpret_cast<const unsigned*>(0x5b75cc)>0;
+}
 static char engine_log[MAX_PATH];
 static volatile float* legacy_wait_rate=nullptr;
 static volatile float* legacy_logic_rate=nullptr;
@@ -17,6 +26,19 @@ static CameraBuild original_camera;
 static FrameDelta original_delta;
 static SimulationStep original_step;
 static SimulationStep original_interpolation;
+static SimulationStep original_snapshot_allocate,original_snapshot_save;
+static SnapshotHistory snapshot_history;
+static bool snapshot_history_hooks_active=false;
+static void __cdecl allocate_snapshots() {original_snapshot_allocate();snapshot_history.reset();}
+static void __cdecl save_snapshots() {
+    original_snapshot_save();
+    const unsigned bank=*reinterpret_cast<const unsigned*>(0x5e8208);
+    const unsigned bytes=*reinterpret_cast<const unsigned*>(0x5e8230);
+    auto** banks=reinterpret_cast<unsigned char**>(0x5e8228);
+    if(bank<=1&&snapshot_history.prime(banks[bank],banks[1-bank],bytes)) {
+        FILE* file=std::fopen(engine_log,"a");if(file){std::fprintf(file,"INTERPOLATION_HISTORY seeded_bytes=%u\n",bytes);std::fclose(file);}
+    }
+}
 static bool smooth_interpolation=true,interpolation_hook_active=false;
 static char engine_config[MAX_PATH];
 static bool isolated_camera_probe=false;
@@ -77,16 +99,26 @@ static int __cdecl camera_build(void* output,void* camera) {
         if(std::isfinite(*aspect)&&*aspect>.3f&&*aspect<8.f) {
             const float saved_aspect=*aspect;const int saved_fov=*fov;
             auto* lens=reinterpret_cast<float*>(camera);
+            float source_position[6];std::memcpy(source_position,lens,sizeof(source_position));
             const float saved_target_z=lens[5];
             if(isolated_camera_probe&&probe_camera_pitch>=-80.f&&probe_camera_pitch<=80.f) {
                 const float dx=lens[3]-lens[0],dy=lens[4]-lens[1];
                 const float distance=std::sqrt(dx*dx+dy*dy);
                 if(std::isfinite(distance)&&distance>1.f)lens[5]=lens[2]+distance*std::tan(probe_camera_pitch*3.14159265358979323846f/180.f);
             }
-            *fov=horplus_fov(saved_fov,saved_aspect,engine_aspect);*aspect=engine_aspect;
+            const double zoom=camera_zoom_index==1?.85:camera_zoom_index==2?.70:1.;
+            *fov=horplus_fov(saved_fov,saved_aspect,engine_aspect,zoom);*aspect=engine_aspect;
             static bool reported=false;
             if(!reported){FILE* file=std::fopen(engine_log,"a");if(file){std::fprintf(file,"CAMERA_HORPLUS original_fov=%d original_aspect=%.6f output_fov=%d output_aspect=%.6f\n",saved_fov,saved_aspect,*fov,*aspect);std::fclose(file);}reported=true;}
             const int result=original_camera(output,camera);
+            ++camera_calls;last_camera_source=camera;
+            if(!isolated_camera_probe&&std::memcmp(source_position,lens,sizeof(source_position)))++camera_position_changes;
+            if(saved_fov>0&&saved_fov<1980) {
+                const double expected=saved_aspect/std::tan(saved_fov*3.14159265358979323846/3960.);
+                const float actual=std::fabs(*reinterpret_cast<float*>(static_cast<unsigned char*>(camera)+0x138));
+                const float ratio=static_cast<float>(actual/expected);
+                if(std::isfinite(ratio)){camera_vertical_min=std::min(camera_vertical_min,ratio);camera_vertical_max=std::max(camera_vertical_max,ratio);}
+            }
             // The original builder copies the corrected camera into its active global
             // before returning. Restore the source lens to prevent cumulative expansion.
             *aspect=saved_aspect;*fov=saved_fov;lens[5]=saved_target_z;
@@ -105,7 +137,7 @@ static double __cdecl frame_delta(int interpolation_phase) {
     ++delta_calls;
     return elapsed;
 }
-static void __cdecl simulation_step() {original_step();++simulation_steps;}
+static void __cdecl simulation_step() {original_step();++simulation_steps;last_simulation_tick=GetTickCount64();}
 
 static void engine_report() {
     if(!timing_hooks_active)return;
@@ -128,12 +160,20 @@ static void engine_report() {
         const float value=std::strtof(pitch,nullptr);
         if(value!=probe_camera_pitch){probe_camera_pitch=value;file=std::fopen(engine_log,"a");if(file){std::fprintf(file,"CAMERA_PROBE pitch_degrees=%.3f (isolated test only)\n",value);std::fclose(file);}}
     }
+    if(camera_calls) {
+        file=std::fopen(engine_log,"a");if(file){std::fprintf(file,"CAMERA_LENS calls=%llu source=%p zoom_preset=%d original_position_changes=%llu vertical_scale_ratio=%.6f:%.6f\n",camera_calls,last_camera_source,camera_zoom_index,camera_position_changes,camera_vertical_min,camera_vertical_max);std::fclose(file);}
+        camera_calls=camera_position_changes=0;camera_vertical_min=100;camera_vertical_max=0;
+    }
+    camera_zoom_index=GetPrivateProfileIntA("Graphics","CameraZoom",0,engine_config);
+    if(camera_zoom_index<0||camera_zoom_index>2)camera_zoom_index=0;
     report_time=now;simulation_steps=delta_calls=0;
 }
 static void start_engine_hooks(const char* directory,const char* config) {
     std::snprintf(engine_log,MAX_PATH,"%sopensoccermania-engine.log",directory);
     std::snprintf(engine_config,MAX_PATH,"%s",config);
     isolated_camera_probe=GetPrivateProfileIntA("Diagnostics","IsolateInstance",0,config)!=0;
+    camera_zoom_index=GetPrivateProfileIntA("Graphics","CameraZoom",0,config);
+    if(camera_zoom_index<0||camera_zoom_index>2)camera_zoom_index=0;
     if(!GetPrivateProfileIntA("Graphics","VerifiedExecutable",0,config))return;
     auto* base=reinterpret_cast<unsigned char*>(GetModuleHandleA(nullptr));
     const unsigned char advance_signature[]={0x56,0x8b,0x74,0x24,0x08,0x8d,0x46,0x18};
@@ -150,6 +190,15 @@ static void start_engine_hooks(const char* directory,const char* config) {
     const unsigned char delta_signature[]={0x83,0xec,0x28,0x53,0x55,0x56,0x8d,0x44};
     const unsigned char step_signature[]={0xd9,0x05,0x10,0x82,0x5e,0x00,0x8b,0x0d};
     const unsigned char interpolation_signature[]={0x51,0xd9,0x05,0x14,0x82,0x5e,0x00,0x53,0x56};
+    const unsigned char allocation_signature[]={0x56,0x8b,0x35,0x30,0x82,0x5e,0x00};
+    const unsigned char save_signature[]={0xa1,0x08,0x82,0x5e,0x00,0x56};
+    if(std::memcmp(base+0x1f7c0,allocation_signature,sizeof(allocation_signature))==0&&
+       std::memcmp(base+0x1fca0,save_signature,sizeof(save_signature))==0) {
+        const auto a=MH_CreateHook(base+0x1f7c0,reinterpret_cast<void*>(allocate_snapshots),reinterpret_cast<void**>(&original_snapshot_allocate));
+        const auto b=MH_CreateHook(base+0x1fca0,reinterpret_cast<void*>(save_snapshots),reinterpret_cast<void**>(&original_snapshot_save));
+        snapshot_history_hooks_active=a==MH_OK&&b==MH_OK;
+        if(!snapshot_history_hooks_active){if(a==MH_OK)MH_RemoveHook(base+0x1f7c0);if(b==MH_OK)MH_RemoveHook(base+0x1fca0);}
+    }
     if(std::memcmp(base+0x1fcd0,interpolation_signature,sizeof(interpolation_signature))==0) {
         smooth_interpolation=GetPrivateProfileIntA("Graphics","SmoothInterpolation",1,config)!=0;
         interpolation_hook_active=MH_CreateHook(base+0x1fcd0,reinterpret_cast<void*>(interpolate_frame),reinterpret_cast<void**>(&original_interpolation))==MH_OK;
@@ -170,6 +219,6 @@ static void start_engine_hooks(const char* directory,const char* config) {
         }
         QueryPerformanceFrequency(&report_frequency);QueryPerformanceCounter(&report_time);
     }
-    FILE* file=std::fopen(engine_log,"a");if(file){std::fprintf(file,"ENGINE_HOOKS camera_frustum=%d separate_render_wait=%d target_fps=%.1f\n",camera_hooks_active,timing_hooks_active,render_limit);std::fclose(file);}
+    FILE* file=std::fopen(engine_log,"a");if(file){std::fprintf(file,"ENGINE_HOOKS camera_frustum=%d separate_render_wait=%d primed_history=%d target_fps=%.1f\n",camera_hooks_active,timing_hooks_active,snapshot_history_hooks_active,render_limit);std::fclose(file);}
 }
 }

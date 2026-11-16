@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add generated widescreen title backgrounds, privately matched to the selected Soccer Mania or Football Mania title edges without replacing the original center artwork.
+- Prime newly allocated interpolation history after its first complete save. Isolated traces reproduce the previous zero-camera feedback and verify stable original camera aspect/up and 50-Hz simulation after the correction; goal/replay acceptance remains open.
+- Add shared native F1 settings, controller Start + View/Select handling, raw button mapping and Xbox navigation hints. Physical-controller acceptance remains open.
+- Separate regional presentation from text language, and add guarded Soccer/Football resource selection without changing the simulation clock.
+- Extend private imports with bounded ISO9660/raw-sector parsing, executable-donor repair and reuse of owner-supplied graphics backends.
+- Preserve existing COM forwarding layers when installing hooks, correcting a reproduced Release recursion during second-device creation.
 - Correct the original interpolator's endpoint snap during the first 5% of a tick. Same-process A/B traces recorded 122 within-tick coefficient rewinds in 2400 frames with the old behavior and none in 1800 frames with the correction. Simulation remained near 50 steps/s; this is not a locked-240-FPS result.
 - Add a smooth-interpolation graphics option, version-checked animation diagnostics and a corrected SA-state sampler.
 - Add a native regression for interpolation continuity and snapshot-bank strides.

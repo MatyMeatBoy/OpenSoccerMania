@@ -98,3 +98,76 @@ of native render texture format. This fingerprint metadata also stays private.
 Synthetic tests validate alpha/zero center bytes, exact top/middle/bottom edge
 colors on both sides, full generated color at blend endpoints, tile samples,
 source/background invalidation, private cache confinement and invalid inputs.
+
+## Native D3D8 integration helper
+
+`native/title_background.h` is independent of the proxy integration. It accepts
+only the exact compositor BITMAPV4 shape and masks, validates every center pixel
+as zero RGBA and every sidebar pixel as opaque, flips the bottom-up rows, then
+uploads one managed A8R8G8B8 texture. Input is bounded to the expected BMP length.
+Configuration is `UI.TitleBackgroundPath`, written by the launcher as an ASCII
+path relative to the selected private entry. Native loading resolves it against
+the configuration directory, independently of changes to the working folder.
+
+Integration calls:
+
+- `osm::start_title_hooks(config, log_path)` before the existing global MinHook
+  enable step. It creates both hooks only for the verified executable and
+  byte-matching image draw, flush, transition, and two title callsites.
+- `osm::title_background.set_device(device)` when the device is created.
+- `osm::title_background.release()` before device destruction/reset; set the
+  device again after successful reset. The helper does not own a device reference.
+- COM Release calls that leave references alive retain the device binding; an
+  ordinary reference decrement must not disable subsequent title rendering.
+- `osm::reset_title_frame()` at Present/reset boundaries as an extra stale-marker
+  guard. Device and hook operations must remain on the game's render thread.
+
+The image draw hook at 0x415850 marks a title frame only when its direct caller
+returns to 0x4f2f86 or 0x4f30a1. This excludes disclaimer and other image screens.
+The transition entry hook at 0x4e2940 consumes that marker, explicitly flushes
+original title/prompt batches via 0x415320, immediately draws the sidebar quads,
+then calls the original transition update/draw/present. No central title draw
+is replaced. The helper uses full target dimensions and draws only the two
+regions outside centered 4:3. It preserves a D3DSBT_ALL state block plus explicit
+viewport and stream-zero references (DrawPrimitiveUP can unbind the stream).
+It never changes render targets. Shader, sampler, depth, stencil, fog, cull,
+blend, clipping and texture-stage states changed for the draw are restored.
+
+Proxy geometry hooks must bypass additional aspect scaling for these physical
+XYZRHW sidebar quads. Their hook callsites can be excluded specifically, or
+integration can route this helper through the original device dispatch.
+The helper itself issues no BeginScene/EndScene or Present calls.
+
+Transition limitation: the original random STAR/CIRCLE/SHUTTERSG/BASIC wipe may
+cover only 4:3. Insertion before transition rendering preserves ordering but
+does not prove those masks cover the added sidebars. Full-width wipe coverage
+requires separate verified integration; prompt blinking values are not fade
+opacity and must not drive sidebar brightness.
+
+`tests/native_title_background.cpp` compiles and passes under the project's
+i686 LLVM-MinGW toolchain. It tests bounded BMP decoding, row orientation,
+center/alpha rejection, narrow/wide geometry and precise context rejection.
+`tests/native_title_render.cpp` also passes against the real D3D8 backend on an
+isolated Win32 desktop, with the input desktop unchanged. It verifies sidebar
+pixels on both sides, exact 239/240 and 1679/1680 joins at 1920 x 1080, preserved
+central output, and restored viewport/fog/blend/stream-zero state. No game or
+visible desktop was launched by this helper task. Actual game transition
+coverage remains unverified.
+
+`osm::title_background_drawing` is an inline thread-local scoped flag covering
+the entire draw, including target-description lookup. The proxy must bypass
+its logical surface descriptions and viewport/DrawPrimitiveUP transformations
+while this flag is set. This allows the helper to operate in physical pixels.
+`Graphics.TitleExtension=0` prevents creation of both context hooks. The first
+actual title-triggered draw writes one bounded log line with result and physical
+target dimensions; subsequent frames do not produce repeated draw logs.
+
+The integrated bridge subsequently reached the real title in an owned isolated
+game probe and logged `first-draw result=ok physical=1920x1080`. The earlier
+integration failed before target lookup because an ordinary device-reference
+release cleared the helper binding; retaining live-device bindings and resolving
+the BMP against the configuration directory corrected this reproduced failure.
+The probe's input desktop stayed unchanged. Its timed shutdown needed forced
+termination of its own process; clean shutdown is not established by this run.
+The captured preceding disclaimer retained black sidebars, as intended by the
+precise title-only gate. Full title/wipe visual acceptance remains open.

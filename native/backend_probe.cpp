@@ -5,6 +5,7 @@
 #include <d3d11.h>
 #include <dxgi1_2.h>
 #include "../third_party/minhook/include/MinHook.h"
+#include "hook_chain.h"
 
 namespace osm {
 using DeviceFactory=HRESULT (WINAPI *)(IDXGIAdapter*,D3D_DRIVER_TYPE,HMODULE,UINT,const D3D_FEATURE_LEVEL*,UINT,UINT,ID3D11Device**,D3D_FEATURE_LEVEL*,ID3D11DeviceContext**);
@@ -30,9 +31,9 @@ static char probe_path[MAX_PATH];
 static unsigned render_width=0,render_height=0;
 
 template<class T> static void replace(T* slot,T replacement,T& original) {
-    if(*slot==replacement)return;
+    if(osm::hook_decision(*slot,replacement,original)!=osm::HookDecision::Install)return;
     DWORD protection;if(!VirtualProtect(slot,sizeof(T),PAGE_READWRITE,&protection))return;
-    original=*slot;*slot=replacement;VirtualProtect(slot,sizeof(T),protection,&protection);
+    if(!original)original=*slot;*slot=replacement;VirtualProtect(slot,sizeof(T),protection,&protection);
 }
 static HRESULT WINAPI present_chain(IDXGISwapChain* swap,UINT interval,UINT flags) {
     if(offscreen_probe&&!(flags&DXGI_PRESENT_TEST)) {

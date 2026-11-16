@@ -7,19 +7,32 @@ import queue
 import subprocess
 import sys
 import threading
+import hashlib
+from contextlib import ExitStack
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from PIL import Image, ImageDraw, ImageTk, ImageFilter
 from . import __version__, fonts, artwork
 from .theme import Bubble, CREAM, GREEN, AMBER, MUTED
-from .sources import discover, prepare, mounted_iso, child
-from .video import VideoSettings, RESOLUTIONS, REFRESH_RATES, AA_MODES, FILTER_MODES, DISPLAY_MODES, RENDER_LIMITS, configure_wrapper
-from .runtime import setup_portable, install_bridge, install_input_bridge, configure_bridge
+from .sources import discover, discover_assets, prepare, prepare_with_executable, mounted_iso, open_disc_image, probe_disc_image, child
+from .video import VideoSettings, RESOLUTIONS, REFRESH_RATES, AA_MODES, FILTER_MODES, DISPLAY_MODES, RENDER_LIMITS, CAMERA_ZOOMS, EDITIONS, LANGUAGES, configure_wrapper
+from .runtime import setup_portable, install_bridge, install_input_bridge, configure_bridge, read_live_settings
+from .backends import find_library_backend, install_backend
+from .title_assets import load_title_image,TitleAssetError
 from .diagnostics import logger, Session
-from .controllers import ControllerBridge, MATCH, KEYS
+from .controllers import ControllerBridge, MATCH, KEYS, RAW_XBOX
 
 ROOT = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent.parent
 HOME = ROOT / 'local'
+
+class ExecutableSourceRequired(ValueError):
+    def __init__(self,path,is_image):self.path,self.is_image=path,is_image
+
+
+class BackendSourceRequired(ValueError):
+    def __init__(self,path,is_image,donor):
+        super().__init__('Select an owner-supplied x86 dgVoodoo D3D8.dll and dgVoodoo.conf to finish this private import.')
+        self.path,self.is_image,self.donor=path,is_image,donor
 
 
 def stadium(size):
@@ -92,7 +105,9 @@ class Launcher:
         controls=self.prefs.get('controls',{})
         self.controller.enabled=controls.get('enabled',True)
         self.controller.deadzone=controls.get('deadzone',.2)
+        self.controller.automatic_mode=controls.get('automatic_mode',True)
         self.controller.mapping['Match']={int(k):v for k,v in controls.get('mapping',MATCH).items()}
+        self.controller.raw_mapping={int(k):int(v) for k,v in controls.get('raw_mapping',RAW_XBOX).items()}
         self.controller.start()
         self.show('Home')
         saved=self.prefs.get('entry')
@@ -133,22 +148,29 @@ class Launcher:
             self.hero_image=picture;hero.delete('all');hero.create_image(0,0,image=picture,anchor='nw')
             hero.create_text(24,40,anchor='nw',text='THE BEAUTIFUL\nBRICK GAME.',fill=CREAM,font=fonts.display(24))
             hero.create_text(26,135,anchor='nw',text='Original charm.\nRoom for a better view.',fill='#dae4c9',font=fonts.ui(12))
+            if getattr(self,'title_preview_image',None):hero.create_image(max(650,event.width)-28,20,image=self.title_preview_image,anchor='ne')
         hero.bind('<Configure>',paint)
+        self.hero=hero;self.paint_hero=paint
         card=ttk.LabelFrame(frame,text=' YOUR GAME ',padding=18);card.pack(fill='x')
         self.game_title=tk.StringVar(value='Let’s get the ball rolling.')
         self.game_detail=tk.StringVar(value='Choose an ISO, an extracted disc, or an installed game folder.')
         ttk.Label(card,textvariable=self.game_title,style='Heading.TLabel').pack(anchor='w')
         ttk.Label(card,textvariable=self.game_detail,style='Muted.TLabel',wraplength=740).pack(anchor='w',pady=(7,15))
+        self.library_choice=tk.StringVar();self.library_entries={}
+        self.library_selector=ttk.Combobox(card,textvariable=self.library_choice,state='readonly')
+        self.library_selector.pack(fill='x',pady=(0,10));self.library_selector.bind('<<ComboboxSelected>>',lambda event:self.choose_library())
         actions=ttk.Frame(card);actions.pack(fill='x')
         self.play_button=ttk.Button(actions,text='Choose game files  →',style='Accent.TButton',command=self.play)
         self.play_button.pack(side='left',padx=(0,12))
         self.folder_button=ttk.Button(actions,text='Choose folder…',command=self.import_folder);self.folder_button.pack(side='left',padx=(0,8))
-        self.iso_button=ttk.Button(actions,text='Choose ISO…',command=self.import_iso);self.iso_button.pack(side='left')
+        self.iso_button=ttk.Button(actions,text='Choose disc image…',command=self.import_iso);self.iso_button.pack(side='left')
         bottom=ttk.Frame(frame);bottom.pack(fill='x',pady=(22,0))
-        for title,body in [('KEEP THE ORIGINALS','Your source files stay untouched.'),('PLAY IN YOUR LANGUAGE','Nine text variants. Eight voice languages.'),('A CLEARER VIEW','Graphics profiles up to 4K / 240 Hz.')]:
-            cell=ttk.Frame(bottom);cell.pack(side='left',fill='both',expand=True)
-            ttk.Label(cell,text=title,style='Caption.TLabel').pack(anchor='w')
-            ttk.Label(cell,text=body,style='Muted.TLabel',wraplength=235).pack(anchor='w',pady=(7,0))
+        saved=self.prefs.get('video',{})
+        self.edition=tk.StringVar(value=saved.get('edition','Football Mania'));self.language=tk.StringVar(value=saved.get('language','English'))
+        for title,var,values in [('REGIONAL EDITION',self.edition,EDITIONS),('TEXT & VOICES',self.language,LANGUAGES)]:
+            cell=ttk.Frame(bottom);cell.pack(side='left',fill='both',expand=True,padx=(0,15));ttk.Label(cell,text=title,style='Caption.TLabel').pack(anchor='w')
+            combo=ttk.Combobox(cell,textvariable=var,values=values,state='readonly');combo.pack(fill='x',pady=(7,0));combo.bind('<<ComboboxSelected>>',lambda event,v=var:self.edition_changed(v is self.edition))
+        self.refresh_library()
 
     def _video(self):
         outer=self.pages['Graphics']
@@ -178,6 +200,9 @@ class Launcher:
         self.sprite_seam_fix=tk.BooleanVar(value=saved.get('sprite_seam_fix',True))
         self.modern_presentation=tk.BooleanVar(value=saved.get('modern_presentation',True))
         self.smooth_interpolation=tk.BooleanVar(value=saved.get('smooth_interpolation',True))
+        self.camera_zoom=tk.StringVar(value=saved.get('camera_zoom','Original zoom'))
+        self.xbox_prompts=tk.BooleanVar(value=saved.get('xbox_prompts',True))
+        self.title_extension=tk.BooleanVar(value=saved.get('title_extension',True))
         card=ttk.LabelFrame(frame,text=' DISPLAY & IMAGE QUALITY ',padding=18);card.pack(fill='x')
         for row,(label,var,values) in enumerate([('Internal render resolution',self.res,RESOLUTIONS),('Fullscreen refresh rate (Hz)',self.hz,list(map(str,REFRESH_RATES))),('Antialiasing',self.aa,list(AA_MODES)),('Texture filtering',self.filter,list(FILTER_MODES))]):
             ttk.Label(card,text=label).grid(row=row,column=0,sticky='w',padx=(0,30),pady=8)
@@ -199,6 +224,11 @@ class Launcher:
         ttk.Checkbutton(card,text='Fix seams in menus and tiled images',variable=self.sprite_seam_fix).grid(row=15,columnspan=2,sticky='w',pady=6)
         ttk.Checkbutton(card,text='Low-latency presentation',variable=self.modern_presentation).grid(row=16,columnspan=2,sticky='w',pady=6)
         ttk.Checkbutton(card,text='Smooth animation interpolation at high FPS',variable=self.smooth_interpolation).grid(row=17,columnspan=2,sticky='w',pady=6)
+        ttk.Label(card,text='Camera framing').grid(row=18,column=0,sticky='w',pady=8)
+        ttk.Combobox(card,textvariable=self.camera_zoom,values=CAMERA_ZOOMS,state='readonly').grid(row=18,column=1,sticky='ew')
+        ttk.Checkbutton(card,text='Xbox button hints for connected controllers',variable=self.xbox_prompts).grid(row=19,columnspan=2,sticky='w',pady=6)
+        ttk.Checkbutton(card,text='Generated title background in widescreen sidebars',variable=self.title_extension).grid(row=20,columnspan=2,sticky='w',pady=6)
+        ttk.Label(card,text='F1 or View / Select + Start opens in-game settings. Original zoom keeps the original camera distance and vertical framing; distant lenses are optional.',style='Muted.TLabel',wraplength=730).grid(row=21,columnspan=2,sticky='w',pady=(8,0))
         ttk.Label(card,text='F11 / Alt+Enter: toggle Windowed and Borderless. The render limit preserves the original simulation rate on verified executable versions. VSync can limit FPS to your display refresh. Windowed and borderless modes use the desktop refresh rate.',style='Muted.TLabel',wraplength=730).grid(row=14,columnspan=2,sticky='w',pady=(8,0))
         ttk.Button(frame,text='Save graphics profile',style='Accent.TButton',command=self.save_video).pack(anchor='w',pady=18)
         ttk.Label(frame,text='VRR · FreeSync · G-SYNC',style='Heading.TLabel').pack(anchor='w',pady=(5,5))
@@ -217,22 +247,34 @@ class Launcher:
         ttk.Button(frame,text='Open diagnostic logs',command=self.open_logs).pack(anchor='w',pady=(8,0))
 
     def _controls(self):
-        frame=self.pages['Controls']
+        outer=self.pages['Controls'];canvas=tk.Canvas(outer,bg=CREAM,highlightthickness=0)
+        bar=ttk.Scrollbar(outer,orient='vertical',command=canvas.yview);canvas.configure(yscrollcommand=bar.set)
+        bar.pack(side='right',fill='y');canvas.pack(side='left',fill='both',expand=True)
+        frame=ttk.Frame(canvas);content=canvas.create_window(0,0,window=frame,anchor='nw')
+        frame.bind('<Configure>',lambda event:canvas.configure(scrollregion=canvas.bbox('all')))
+        canvas.bind('<Configure>',lambda event:canvas.itemconfigure(content,width=event.width))
+        self.root.bind('<MouseWheel>',lambda event:canvas.yview_scroll(-int(event.delta/120),'units') if outer.winfo_ismapped() else None,add='+')
         self.heading(frame,'YOUR TEAM. YOUR CONTROLLER.','Pick up and play.','SDL3 handles XInput, mapped gamepads and raw DirectInput/HID devices. The bridge controls the game only while its window has focus.')
         self.controller_status=tk.StringVar(value='Starting controller discovery…')
         ttk.Label(frame,textvariable=self.controller_status,style='Heading.TLabel',wraplength=760).pack(anchor='w',pady=(0,14))
         settings=self.prefs.get('controls',{})
         self.controller_enabled=tk.BooleanVar(value=settings.get('enabled',True))
+        self.controller_auto=tk.BooleanVar(value=settings.get('automatic_mode',True))
         self.controller_mode=tk.StringVar(value='Menu')
         self.controller_deadzone=tk.StringVar(value=f"{round(settings.get('deadzone',.2)*100)}%")
         ttk.Checkbutton(frame,text='Enable SDL controller bridge (select Keyboard in the game)',variable=self.controller_enabled).pack(anchor='w',pady=8)
+        ttk.Checkbutton(frame,text='Automatically switch between game and menu controls',variable=self.controller_auto).pack(anchor='w',pady=4)
+        self.device_choice=tk.StringVar(value='Automatic');self.device_options={'Automatic':None};self.device_signature=None
+        ttk.Label(frame,text='Active controller').pack(anchor='w',pady=(8,4))
+        self.device_selector=ttk.Combobox(frame,textvariable=self.device_choice,values=['Automatic'],state='readonly');self.device_selector.pack(fill='x')
+        self.device_selector.bind('<<ComboboxSelected>>',lambda event:setattr(self.controller,'selected_id',self.device_options.get(self.device_choice.get())))
         row=ttk.Frame(frame);row.pack(fill='x',pady=8)
         ttk.Label(row,text='Input layout').pack(side='left',padx=(0,15))
         mode=ttk.Combobox(row,textvariable=self.controller_mode,values=['Menu','Match'],state='readonly',width=12);mode.pack(side='left')
         mode.bind('<<ComboboxSelected>>',lambda event:setattr(self.controller,'mode',self.controller_mode.get()))
         ttk.Label(row,text='Stick deadzone').pack(side='left',padx=(24,12))
         ttk.Combobox(row,textvariable=self.controller_deadzone,values=['10%','15%','20%','25%','30%'],state='readonly',width=9).pack(side='left')
-        ttk.Label(frame,text='Press View / Back to switch between Menu and Match layouts. Menu: A confirms, B goes back. Match: A passes, B shoots, X plays a long ball, Y activates power-ups.',style='Muted.TLabel',wraplength=760).pack(anchor='w',pady=(8,15))
+        ttk.Label(frame,text='View / Select + Start opens in-game settings. Menu: A confirms, B goes back. Match: A passes, B shoots, X plays a long ball, Y activates power-ups. Start pauses when released; the settings chord never also pauses the game.',style='Muted.TLabel',wraplength=760).pack(anchor='w',pady=(8,15))
         card=ttk.LabelFrame(frame,text=' XBOX-STYLE MATCH LAYOUT ',padding=15);card.pack(fill='x')
         self.controller_keys={}
         mapping={int(k):v for k,v in settings.get('mapping',MATCH).items()}
@@ -241,13 +283,75 @@ class Launcher:
             ttk.Label(card,text=label).grid(row=row,column=0,sticky='w',padx=(0,30),pady=4)
             ttk.Combobox(card,textvariable=variable,values=list(KEYS),state='readonly',width=14).grid(row=row,column=1,sticky='ew',pady=4)
         card.columnconfigure(1,weight=1)
+        raw=ttk.LabelFrame(frame,text=' UNMAPPED DEVICE BUTTONS ',padding=15);raw.pack(fill='x',pady=(18,0))
+        ttk.Label(raw,text='Only used for raw joysticks without an SDL gamepad mapping. Button numbers start at zero.',style='Muted.TLabel',wraplength=700).grid(row=0,columnspan=2,sticky='w',pady=(0,8))
+        mapping={int(k):int(v) for k,v in settings.get('raw_mapping',RAW_XBOX).items()};self.raw_buttons={}
+        for row,(button,label) in enumerate([(0,'A'),(1,'B'),(2,'X'),(3,'Y'),(9,'LB'),(10,'RB'),(4,'View / Select'),(6,'Start / Menu')],1):
+            variable=tk.StringVar(value=str(next((k for k,v in mapping.items() if v==button),-1)));self.raw_buttons[button]=variable
+            ttk.Label(raw,text=label).grid(row=row,column=0,sticky='w',padx=(0,25),pady=3)
+            ttk.Combobox(raw,textvariable=variable,values=['-1',*map(str,range(32))],state='readonly',width=14).grid(row=row,column=1,sticky='ew',pady=3)
+        raw.columnconfigure(1,weight=1)
         ttk.Button(frame,text='Save controller profile',style='Accent.TButton',command=self.save_controls).pack(anchor='w',pady=15)
-        ttk.Label(frame,text='Left stick / D-pad: movement. Raw devices without an SDL gamepad mapping may need button remapping. This first bridge drives one keyboard player; native multiplayer remains separate.',style='Muted.TLabel',wraplength=760).pack(anchor='w')
+        ttk.Label(frame,text='Left stick / D-pad: movement. SDL handles mapped XInput, DirectInput and HID devices. Raw devices can use the button profile above. This bridge drives one keyboard player; native multiplayer remains separate. Physical devices still need acceptance testing.',style='Muted.TLabel',wraplength=760).pack(anchor='w')
 
     def save_controls(self):
-        settings={'enabled':self.controller_enabled.get(),'deadzone':int(self.controller_deadzone.get().rstrip('%'))/100,'mapping':{k:v.get() for k,v in self.controller_keys.items()}}
+        raw={}
+        for button,var in self.raw_buttons.items():
+            index=int(var.get())
+            if index<0:continue
+            if index in raw:self.status.set('Assign a different physical button to each raw controller action.');return
+            raw[index]=button
+        settings={'enabled':self.controller_enabled.get(),'automatic_mode':self.controller_auto.get(),'deadzone':int(self.controller_deadzone.get().rstrip('%'))/100,'mapping':{k:v.get() for k,v in self.controller_keys.items()}}
+        settings['raw_mapping']=raw;self.controller.raw_mapping=raw
+        self.controller.automatic_mode=settings['automatic_mode']
         self.controller.enabled=settings['enabled'];self.controller.deadzone=settings['deadzone'];self.controller.mapping['Match']=settings['mapping']
         self.prefs['controls']=settings;self.persist();self.status.set('Controller profile saved. Game input is released whenever another app has focus.')
+
+    def refresh_library(self):
+        folder=HOME/'library';self.library_entries={}
+        if folder.is_dir():
+            for entry in sorted(folder.iterdir())[:200]:
+                if entry.is_symlink() or not entry.is_dir():continue
+                try:
+                    info=json.loads((entry/'opensoccermania-source.json').read_text(encoding='utf-8'))
+                    label=f"{Path(info['source']).name} · {entry.name}"
+                    if info.get('asset_repair'):label+=' · private runtime repair'
+                    self.library_entries[label]=entry
+                except (OSError,ValueError,KeyError):continue
+        self.library_selector.configure(values=list(self.library_entries))
+        for label,entry in self.library_entries.items():
+            if getattr(self,'entry',None)==entry:self.library_choice.set(label)
+
+    def choose_library(self):
+        if self.busy or self.process is not None:return
+        path=self.library_entries.get(self.library_choice.get())
+        if path:self.set_entry(path)
+
+    def refresh_title_preview(self):
+        self.title_preview_image=None
+        if self.entry:
+            try:
+                picture=load_title_image(self.entry,'soccer' if self.edition.get()=='Soccer Mania' else 'football')
+                picture.thumbnail((240,180),Image.Resampling.LANCZOS)
+                self.title_preview_image=ImageTk.PhotoImage(picture,master=self.root)
+            except (OSError,ValueError,TitleAssetError) as error:self.log.info('Title preview unavailable: %s',error)
+        self.paint_hero(type('Size',(),{'width':max(650,self.hero.winfo_width())})())
+
+    def edition_changed(self,edition_changed=False):
+        if edition_changed and self.language.get() in ('American','English'):
+            self.language.set('American' if self.edition.get()=='Soccer Mania' else 'English')
+        self.prefs.setdefault('video',{}).update(edition=self.edition.get(),language=self.language.get())
+        self.persist();self.refresh_title_preview();self.status.set('Edition and language apply on the next launch. The original simulation clock is preserved.')
+
+    def sync_live_settings(self):
+        if not self.entry:return
+        try:
+            settings=read_live_settings(self.entry,VideoSettings(**self.prefs.get('video',{})))
+            self.prefs['video']=asdict(settings);self.persist()
+            self.camera_zoom.set(settings.camera_zoom);self.performance_hud.set(settings.performance_hud)
+            self.overlay_scale.set(f'{settings.overlay_scale}%');self.smooth_interpolation.set(settings.smooth_interpolation);self.xbox_prompts.set(settings.xbox_prompts)
+            self.render_fps.set(next(label for label,value in RENDER_LIMITS.items() if value==settings.render_fps))
+        except (OSError,ValueError,TypeError) as error:self.log.warning('Could not synchronize in-game preferences: %s',error)
 
     def show(self,name):
         for page in self.pages.values():page.pack_forget()
@@ -270,29 +374,63 @@ class Launcher:
             text=f"Executable SHA-256\n{info['sha256']}\n\nText variants\n{', '.join(info['languages'])}\n\nVoices\n{', '.join(info['voices'])}\n\nD3D8 wrapper: {'present' if wrapper else 'not supplied'}\n\nSource preserved at\n{info['source']}\n\nSupported hashes receive reversible startup patches in the private copy. Version-checked engine hooks separate rendering from the original simulation clock and adjust the camera lens.\n\nFull-match timing, character animations and all-map rendering remain unverified."
             self.report.configure(state='normal');self.report.delete('1.0','end');self.report.insert('1.0',text);self.report.configure(state='disabled')
             self.status.set('Game imported. Graphics profiles affect your private copy only.')
+            self.sync_live_settings();self.refresh_library();self.refresh_title_preview()
         except (OSError,ValueError,KeyError) as error:
             self.entry=None;self.status.set(f'Library entry needs repair: {error}')
 
     def run_work(self,work):
         if self.busy or self.process is not None:return
         self.busy=True
+        self.library_selector.configure(state='disabled')
         for b in [self.play_button,self.folder_button,self.iso_button]:b.configure(state='disabled')
         def run():
             try:self.queue.put(('ready',work()))
+            except ExecutableSourceRequired as error:self.queue.put(('donor',(error.path,error.is_image)))
+            except BackendSourceRequired as error:self.queue.put(('backend',(error.path,error.is_image,error.donor)))
             except Exception as error:
                 self.log.exception('Game import failed');self.queue.put(('error',str(error)))
         threading.Thread(target=run,daemon=True).start()
 
-    def import_path(self,path,is_iso=False):
+    def import_path(self,path,is_iso=False,donor=None,backend=None):
         def work():
             def copy(root):
-                source=discover(root)
-                target=HOME/'library'/source.sha256[:16]
-                if not target.exists():prepare(source,target,lambda s:self.queue.put(('status',s)))
+                try:source=discover(root);assets=None
+                except ValueError:
+                    assets=discover_assets(root)
+                    if donor is None:raise ExecutableSourceRequired(path,is_iso)
+                    source=discover(donor)
+                key=hashlib.sha256(str(Path(path).resolve()).encode('utf-8')).hexdigest()[:10]
+                target=HOME/'library'/f'{source.sha256[:16]}-{key}'
+                if not target.exists():
+                    progress=lambda s:self.queue.put(('status',s))
+                    if assets:prepare_with_executable(assets,source,target,progress)
+                    else:prepare(source,target,progress)
+                    manifest=target/'opensoccermania-source.json';info=json.loads(manifest.read_text(encoding='utf-8'))
+                    info.update(source=str(Path(path).resolve()),source_kind='disc image' if is_iso else 'folder')
+                    if is_iso:info['source_image']=str(Path(path).resolve())
+                    manifest.write_text(json.dumps(info,indent=2),encoding='utf-8')
+                wrapper=child(target,'d3d8.dll')
+                config=child(target,'dgVoodoo.conf')
+                if not wrapper or not config:
+                    if wrapper or config or child(target,'d3d8_backend.dll') or child(target,'opensoccermania-bridge.sha256'):
+                        raise ValueError('This private entry has an incomplete graphics setup. Its existing files were preserved. Restore its matching D3D8 wrapper and dgVoodoo.conf before importing again.')
+                    supplied=backend or find_library_backend(HOME/'library')
+                    if supplied is None:raise BackendSourceRequired(path,is_iso,donor)
+                    self.queue.put(('status','Copying your graphics backend into the private library entry...'))
+                    if not install_backend(target,*supplied):
+                        raise ValueError('Graphics files appeared during import. They were preserved; review the private entry before retrying.')
                 setup_portable(target,source.sha256)
                 return target
             if is_iso:
-                with mounted_iso(path) as root:return copy(root)
+                probe=probe_disc_image(path)
+                if not probe.supported:raise ValueError(probe.reason)
+                if Path(path).suffix.lower()=='.iso' and probe.sector_size==2048:
+                    stack=ExitStack()
+                    try:root=stack.enter_context(mounted_iso(path))
+                    except ValueError:stack.close()
+                    else:
+                        with stack:return copy(root)
+                with open_disc_image(path) as root:return copy(root)
             return copy(path)
         self.status.set('Inspecting game files…');self.run_work(work)
 
@@ -303,7 +441,7 @@ class Launcher:
 
     def import_iso(self):
         if self.busy or self.process is not None:return
-        path=filedialog.askopenfilename(title='Choose your LEGO Soccer Mania ISO',filetypes=[('ISO disc image','*.iso')])
+        path=filedialog.askopenfilename(title='Choose your game disc image',filetypes=[('Disc image','*.iso *.bin *.cue *.img *.mdf *.mds *.nrg'),('All files','*.*')])
         if path:self.import_path(path,True)
 
     def save_video(self):
@@ -317,6 +455,9 @@ class Launcher:
             settings.sprite_seam_fix=self.sprite_seam_fix.get()
             settings.modern_presentation=self.modern_presentation.get()
             settings.smooth_interpolation=self.smooth_interpolation.get()
+            settings.camera_zoom=self.camera_zoom.get();settings.xbox_prompts=self.xbox_prompts.get()
+            settings.edition=self.edition.get();settings.language=self.language.get();settings.title_extension=self.title_extension.get()
+            settings.__post_init__()
             if self.entry:
                 config=child(self.entry,'dgVoodoo.conf')
                 wrapper=child(self.entry,'d3d8.dll')
@@ -351,6 +492,7 @@ class Launcher:
             if not self.save_video():return
             self.session=Session(HOME,self.entry,self.prefs.get('video',{}))
             self.process=subprocess.Popen([str(exe),'.\\Mania\\CD\\'],cwd=self.entry,stdout=self.session.stream,stderr=subprocess.STDOUT)
+            self.library_selector.configure(state='disabled')
             self.controller.pid=self.process.pid
             self.log.info('Game launched pid=%s logs=%s',self.process.pid,self.session.folder)
             self.status.set('Game launched. Waiting for the game process…')
@@ -366,19 +508,37 @@ class Launcher:
                 kind,value=self.queue.get_nowait()
                 if kind=='status':self.status.set(value);continue
                 self.busy=False
+                self.library_selector.configure(state='readonly')
                 for b in [self.play_button,self.folder_button,self.iso_button]:b.configure(state='normal')
                 if kind=='ready':self.set_entry(value)
+                elif kind=='donor':
+                    self.status.set('This source has usable assets but needs an intact executable from another copy you own.')
+                    donor=filedialog.askdirectory(title='Choose an intact Soccer / Football Mania copy for private runtime repair')
+                    if donor:self.import_path(value[0],value[1],donor)
+                elif kind=='backend':
+                    self.status.set('Choose your own x86 dgVoodoo D3D8.dll and configuration. Your original game files remain unchanged.')
+                    dll=filedialog.askopenfilename(title='Choose your owner-supplied x86 dgVoodoo D3D8.dll',filetypes=[('D3D8 backend','*.dll')])
+                    if dll:
+                        adjacent=Path(dll).with_name('dgVoodoo.conf')
+                        conf=str(adjacent) if adjacent.is_file() else filedialog.askopenfilename(title='Choose the matching dgVoodoo.conf',filetypes=[('dgVoodoo configuration','*.conf')])
+                        if conf:self.import_path(value[0],value[1],value[2],(dll,conf))
                 else:self.status.set(value);messagebox.showerror('Could not import game',value)
         except queue.Empty:pass
         if self.process is not None and self.process.poll() is not None:
             code=self.process.returncode;self.process=None;self.play_button.configure(state='normal')
             self.controller.pid=None
+            self.library_selector.configure(state='readonly');self.sync_live_settings()
             if self.session:self.session.finish(code);self.session=None
             self.log.info('Game exited code=%s',code)
             self.status.set(f'Game closed (exit code {code}).' if code else 'Match finished. Ready when you are.')
         if hasattr(self,'controller'):
             self.controller_status.set(self.controller.status)
             self.controller_mode.set(self.controller.mode)
+            signature=tuple((d['id'],d['name']) for d in self.controller.devices)
+            if signature!=self.device_signature:
+                self.device_signature=signature;self.device_options={'Automatic':None,**{f"{d['name']} [{d['id']}]":d['id'] for d in self.controller.devices}}
+                self.device_selector.configure(values=list(self.device_options))
+                if self.device_choice.get() not in self.device_options:self.device_choice.set('Automatic');self.controller.selected_id=None
         self.root.after(100,self.poll)
 
     def open_library(self):

@@ -1,11 +1,38 @@
 import hashlib,tempfile,unittest,json
 from pathlib import Path
 from unittest.mock import patch
-from opensoccermania.runtime import install_bridge,configure_bridge
+from opensoccermania.runtime import install_bridge,configure_bridge,read_live_settings
 from opensoccermania.video import VideoSettings
 from opensoccermania.sources import mounted_iso
 
 class RuntimeTests(unittest.TestCase):
+    def test_title_background_uses_private_relative_path_and_independent_region(self):
+        with tempfile.TemporaryDirectory() as t:
+            entry=Path(t).resolve()
+            metadata={'backgroundBmp':str(entry/'opensoccermania-title/title.bmp'),'centerRect':[682,0,1365,512]}
+            with patch('opensoccermania.title_presentation.prepare_title_presentation',return_value=metadata):
+                configure_bridge(entry,VideoSettings(edition='Soccer Mania',language='Spanish'))
+            data=(entry/'opensoccermania.ini').read_text()
+            self.assertIn('TitleBackgroundPath = opensoccermania-title/title.bmp',data)
+            self.assertIn('TitleCenterLeft = 682',data)
+            self.assertIn('TitleCenterRight = 1365',data)
+            self.assertIn('Edition = SOCCER',data)
+            self.assertIn('Language = SPANISH',data)
+            self.assertNotIn(str(entry),data)
+
+    def test_live_panel_only_accepts_valid_options(self):
+        with tempfile.TemporaryDirectory() as t:
+            entry=Path(t)
+            settings=VideoSettings(edition='Soccer Mania',language='Spanish')
+            (entry/'opensoccermania.ini').write_text('[Graphics]\nCameraZoom=2\nOverlayScale=175\nRenderFPS=480\nSmoothInterpolation=0\nXboxPrompts=1\nOutputWidth=999999\n[Game]\nLanguage=UNKNOWN\n')
+            changed=read_live_settings(entry,settings)
+            self.assertEqual(changed.camera_zoom,'Distant view (experimental)')
+            self.assertEqual(changed.overlay_scale,175)
+            self.assertEqual(changed.render_fps,480)
+            self.assertFalse(changed.smooth_interpolation)
+            self.assertEqual((changed.width,changed.edition,changed.language),(1920,'Soccer Mania','Spanish'))
+            (entry/'opensoccermania.ini').write_text('[Graphics]\nCameraZoom=-1\nOverlayScale=9999\nRenderFPS=-10\nSmoothInterpolation=7\n')
+            self.assertEqual(read_live_settings(entry,settings),settings)
     def test_bridge_keeps_backend_and_detects_unexpected_changes(self):
         with tempfile.TemporaryDirectory() as t:
             root=Path(t);entry=root/'game';entry.mkdir();bridge=root/'bridge.dll';bridge.write_bytes(b'new')

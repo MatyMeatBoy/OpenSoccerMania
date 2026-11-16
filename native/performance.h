@@ -44,6 +44,8 @@ class PerformanceHud {
         SelectObject(dc,old_font);SelectObject(dc,previous);DeleteObject(font);DeleteObject(bitmap);DeleteDC(dc);
     }
 public:
+    void set_enabled(bool value){enabled=value;}
+    bool is_enabled()const{return enabled;}
     void release(IDirect3DDevice8* device) {
         if(text_device!=device)return;
         auto* texture=text_texture;text_texture=nullptr;text_device=nullptr;last_update=0;

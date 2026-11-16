@@ -23,7 +23,7 @@ OpenSoccerMania gives your own game files a new desktop launcher and an incremen
 | Area | Implementation and evidence |
 |---|---|
 | Launcher | English interface, rounded controls, textured football artwork and local settings. |
-| Import | Extracted disc and installation discovery; ISO import through a read-only Windows mount. ISO mount lifecycle has mocked automated coverage; a real owner ISO still needs testing. |
+| Import | Private folder imports and content-checked ISO9660/raw-sector images, with read-only mounting or bounded extraction. See [supported layouts and limits](docs/disc-import.md); real image acceptance remains open. |
 | Preservation | Private copies, executable hashes, original backups and reversible version-locked startup patches. |
 | Startup | The owner's supported private copy reaches menus and active gameplay. A complete match and save/reload remain acceptance work. |
 | Modern output | D3D8 commands translated to Direct3D 11 through the user-supplied dgVoodoo wrapper; native instrumentation confirmed 1920×1080 render targets with 4× MSAA. |
@@ -51,9 +51,19 @@ powershell -ExecutionPolicy Bypass -File tools/build_native.ps1 -Toolchain "path
 
 Then run `.venv\Scripts\python -m opensoccermania.launcher`. Python 3.11 with Tkinter, Pillow, Windows 10/11 and LLVM-MinGW are required. MinHook is vendored; SDL3 is included with its license.
 
-Choose **a folder** containing an extracted disc or installed game, or choose **an ISO**. The launcher imports into `local/library/`; your source remains unchanged. Windows must be able to mount the ISO and expose its filesystem. Zero-filled executables are rejected with an error.
+Choose **a folder** containing an extracted disc or installed game, or choose
+**a disc image**. The launcher imports into `local/library/`; your source remains
+unchanged. Image support is detected from content, including bounded single-track
+raw layouts and restricted CUE files. Extraction requires 7-Zip when read-only
+Windows mounting is unavailable. Damaged or zero-filled executables require a
+supported executable donor; usable assets are retained in the private import.
 
-The current graphics path requires dgVoodoo's x86 D3D8 wrapper and configuration. Supply them in the private imported folder before applying graphics settings; the bridge preserves the wrapper as `d3d8_backend.dll`. Obtain dgVoodoo from its [official site](https://dege.freeweb.hu/dgVoodoo2/). An arbitrary preinstalled `dinput8.dll` is never silently overwritten.
+The current graphics path requires dgVoodoo's x86 D3D8 wrapper and configuration.
+Imports reuse a validated owner-supplied backend already in the private library,
+or ask for its DLL/configuration. The bridge preserves that wrapper as
+`d3d8_backend.dll`. Obtain dgVoodoo from its
+[official site](https://dege.freeweb.hu/dgVoodoo2/). Existing unknown graphics or
+input DLLs are never silently overwritten.
 
 ## Graphics
 
@@ -63,6 +73,7 @@ The current graphics path requires dgVoodoo's x86 D3D8 wrapper and configuration
 - Windowed, borderless and exclusive fullscreen presentation. F11 / Alt+Enter toggle Windowed and Borderless while preserving the internal render resolution.
 - Aspect-preserving default presentation. Experimental Hor+ work is incomplete, especially shader-based HUD and cinematic handling.
 - Version-checked Hor+ lens conversion preserves vertical framing; background-layer raster/depth/fog corrections address the black sky, and a separate sprite path addresses tiled-image seams. See [render-layer investigation](docs/render-layer-corrections.md).
+- Generated blue title sidebars for 16:9 and ultrawide, with private edge-color matching for both regional titles. The original 4:3 artwork remains unchanged. See [title artwork and verification](docs/title-branding.md); transition coverage remains experimental.
 
 The intended video policy is matching black backgrounds for opening logos, original aspect ratios for cinematics, and integer scaling where practical. HUD elements must keep their shape and adjust to the selected aspect ratio. These are acceptance requirements, not completed feature claims.
 
