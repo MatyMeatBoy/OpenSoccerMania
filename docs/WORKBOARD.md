@@ -1,7 +1,7 @@
 # OpenSoccerMania work board
 
-Updated: 2026-11-16. Published 0.1.0-pre.1 as a limited public source snapshot;
-subsequent development remains unreleased. See the release scope.
+Updated: 2026-11-16. The 0.1.0-pre.2 delivery adds a Windows portable launcher
+alongside inventoried source. See [scope and limits](releases/0.1.0-pre.2.md).
 
 ## Current pass: original clock and independent rendering
 
@@ -22,8 +22,17 @@ OptiPort reference: `MatyMeatBoy/OptiPort`, main commit `9673006504bf6712b320da7
 
 ### Unreleased integration checks
 
-- Python suite: 60 tests pass, one platform privilege skip. The native suite has
-  13 passing checks, including title BMP validation and hook-chain ownership.
+- Pre.2 checks: 76 Python tests run, with one platform privilege skip. The native
+  suite has 14 passing checks, including title BMP validation, hook-chain
+  ownership and precise stencil-composite classification.
+- An asset-free fixture using the production bridge reproduces the stencil
+  resolve being limited to 4:3. The corrected bridge shades first/last pixels
+  across 1920x1080 and preserves an ordinary same-depth HUD control. This is one
+  identified world-effect path, not all-map acceptance.
+- The Windows x64 portable candidate opens/closes all four launcher pages in an
+  isolated desktop, validates bundled resource hashes/architectures and leaves
+  settings temporary. Closed ZIP extraction and release identity checks apply to
+  the final artifacts separately.
 - Native F1 settings and Start + View/Select transport are implemented. The
   settings overlay has an isolated GPU check; physical controller acceptance
   and original in-game button-art replacement remain open.

@@ -135,3 +135,37 @@ error and its files remain unchanged. Headless tests exercise automatic reuse,
 explicit selection, missing-backend handling and preservation; no GUI is opened
 by these tests. An optional local test also validates/copies the actual private
 owner backend into a disposable directory and checks source hashes afterward.
+
+## Actual owner-provided folder checks for pre.2
+
+A bounded local check imported all three supplied folders into separate disposable
+private entries, copying approximately 1.26 GB in total. It used the actual import,
+backend and version-locked portable setup APIs, generated profiles, and decoded
+both Soccer and Football title brands in memory. No game, installer or desktop UI
+was launched. The private evidence summary is retained outside Git at
+`local/pre2-import-validation.json`.
+
+| Owner-provided folder | Executable selection | Graphics backend handling |
+| --- | --- | --- |
+| ElectronicArts-LegoSoccerMania | Original remains asset-only; an explicitly selected intact nested Football copy supplied its private runtime. | Validated existing private-library backend copied into the disposable entry. |
+| lego FOOTBALL MANIA | Intact executable in its known nested installer layout. | Validated existing private-library backend copied into the disposable entry. |
+| Lego Football Mania Dutch | Intact root executable. | Its complete supplied wrapper/configuration pair was preserved and validated. |
+
+All three entries exposed nine text languages and eight voice folders. Both title
+brands decoded at 640 × 480. Their configured edition/language, supported patched
+executable hash, native/input bridge copies and profile settings passed the check.
+All 62 protected original/backend file hashes matched afterward, and every
+disposable entry was removed. These results establish import and profile setup for
+these inputs; they do not establish gameplay, full-match timing, physical
+controller acceptance or universal disc-image compatibility.
+
+The Dutch cleanup exposed Windows read-only attributes retained by `copy2` on
+private message files. Failed-import cleanup now validates the exact created
+`.import-*` staging path under its destination parent and rejects links/reparse
+points before deletion. Only a failed unlink with `PermissionError` may clear the
+read-only bit on a regular private file with no extra hard links inside that tree,
+then retry once. Original paths and attributes are preserved. If cleanup still
+fails, its staging path and the original import error are reported together;
+cleanup errors are not suppressed. Focused Windows tests reproduce a real
+post-copy import failure with read-only input, verify original hashes/attributes,
+and verify staging removal and junction refusal.

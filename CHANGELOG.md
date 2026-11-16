@@ -1,7 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.1.0-pre.2 — 2026-11-16
 
+- Add an inventoried Windows x64 portable launcher package, including its Python/runtime dependencies and project x86 bridges, with isolated packaged-UI smoke testing.
+- Correct the verified stencil-shadow resolve being compressed into the old 4:3 center; preserve ordinary HUD framing and cover the physical pixel edges.
+- Allow experimental camera zoom presets when Hor+ is disabled, retaining the untouched stock path for default non-Hor+ framing.
+- Recover failed-import staging containing copied read-only files while preserving original attributes and refusing linked/outside cleanup targets.
 - Add generated widescreen title backgrounds, privately matched to the selected Soccer Mania or Football Mania title edges without replacing the original center artwork.
 - Prime newly allocated interpolation history after its first complete save. Isolated traces reproduce the previous zero-camera feedback and verify stable original camera aspect/up and 50-Hz simulation after the correction; goal/replay acceptance remains open.
 - Add shared native F1 settings, controller Start + View/Select handling, raw button mapping and Xbox navigation hints. Physical-controller acceptance remains open.

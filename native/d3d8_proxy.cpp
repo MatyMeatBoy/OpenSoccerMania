@@ -710,13 +710,33 @@ static void probe_screen_vertices(IDirect3DDevice8* device,UINT start,UINT count
     IDirect3DVertexBuffer8_Release(buffer);++probes;
 }
 
+#include "world_effects.h"
+static bool world_stencil_draw(IDirect3DDevice8* device,D3DPRIMITIVETYPE type,UINT count,const void* data,UINT stride) {
+    if(data!=reinterpret_cast<const void*>(0x65ba20)||type!=D3DPT_TRIANGLESTRIP||count!=2||stride!=20||!on_backbuffer(device))return false;
+    static const bool supported=[] {
+        const auto* base=reinterpret_cast<const unsigned char*>(GetModuleHandleA(nullptr));
+        if(reinterpret_cast<std::uintptr_t>(base)!=0x400000||!GetPrivateProfileIntA("Graphics","VerifiedExecutable",0,config_path))return false;
+        const auto* dos=reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
+        if(dos->e_magic!=IMAGE_DOS_SIGNATURE||dos->e_lfanew<0||dos->e_lfanew>0x1000-static_cast<LONG>(sizeof(IMAGE_NT_HEADERS32)))return false;
+        const auto* nt=reinterpret_cast<const IMAGE_NT_HEADERS32*>(base+dos->e_lfanew);
+        return nt->Signature==IMAGE_NT_SIGNATURE&&nt->OptionalHeader.Magic==IMAGE_NT_OPTIONAL_HDR32_MAGIC&&
+            osm::world_stencil_signature(base,nt->OptionalHeader.SizeOfImage,true);
+    }();
+    DWORD format=0,stencil=FALSE;
+    if(!supported||FAILED(current_shader(device,&format))||FAILED(IDirect3DDevice8_GetRenderState(device,D3DRS_STENCILENABLE,&stencil)))return false;
+    return osm::world_stencil_composite(supported,reinterpret_cast<std::uintptr_t>(data),format,type,count,stride,stencil!=FALSE,data,logical_width,logical_height);
+}
 static HRESULT WINAPI draw_up(IDirect3DDevice8* device,D3DPRIMITIVETYPE type,UINT count,const void* data,UINT stride) {
     if(osm::title_background_drawing)return real_draw_up(device,type,count,data,stride);
     ++up_draws;std::vector<unsigned char> copy;
     bool flat=false,background=false;
     if(up_draws<=3){DWORD fvf=0;IDirect3DDevice8_GetVertexShader(device,&fvf);FILE* file=std::fopen(log_path,"a");if(file){std::fprintf(file,"draw_up fvf=%lx stride=%u\n",fvf,stride);std::fclose(file);}}
     const UINT vertices=count<=100000?vertex_count(type,count):0;
-    if(vertices && copy_hud(device,data,vertices,stride,copy,true,&flat,&background))data=copy.data();
+    const bool world_stencil=wide&&world_stencil_draw(device,type,count,data,stride);
+    osm::WorldStencilVertex stencil_vertices[4];
+    if(world_stencil){std::memcpy(stencil_vertices,data,sizeof(stencil_vertices));osm::world_stencil_edges(stencil_vertices,logical_width,logical_height);data=stencil_vertices;}
+    const bool hud=!world_stencil;
+    if(vertices && copy_hud(device,data,vertices,stride,copy,hud,&flat,&background))data=copy.data();
     DrawAdjustment adjustment(device,flat,background);
     SkyProjectiveCopy projective(device,data,vertices,stride,background);
     const HRESULT result=real_draw_up(device,type,count,projective.data(data),projective.vertex_stride(stride));

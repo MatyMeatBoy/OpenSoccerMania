@@ -7,6 +7,8 @@ import shutil
 import subprocess
 import tempfile
 import os
+import stat
+import sys
 from .disc_images import _unlinked, probe_disc_image, open_disc_image
 from contextlib import contextmanager
 
@@ -133,6 +135,33 @@ def discover(path):
     return Source(root, exe, data, languages, voices, _hash(exe))
 
 
+def _remove_private_staging(temporary, library_parent):
+    """Remove only this call's confined staging tree, including readonly copies."""
+    parent = _unlinked(library_parent)
+    root = _unlinked(temporary)
+    if root.parent != parent or not root.name.startswith('.import-'):
+        raise ValueError('Refusing cleanup outside the private import staging directory.')
+    _assert_tree(root)  # Reject links/reparse points before any recursive deletion.
+
+    def readonly_copy(function, filename, details):
+        error = details[1]
+        if not isinstance(error, PermissionError) or function is not os.unlink:
+            raise error
+        path = _unlinked(filename)
+        if not path.is_relative_to(root) or path == root:
+            raise ValueError('Refusing attribute changes outside private import staging.')
+        info = path.lstat()
+        readonly = (getattr(info, 'st_file_attributes', 0) & 1) if os.name == 'nt' else not (info.st_mode & stat.S_IWUSR)
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or not readonly:
+            raise error
+        # copy2 made a separate private file. Never chmod the owner input or a
+        # linked file; retry only the failed unlink, once, after PermissionError.
+        path.chmod(info.st_mode | stat.S_IWUSR)
+        function(path)
+
+    shutil.rmtree(root, onerror=readonly_copy)
+
+
 def prepare(source, destination, progress=lambda message: None):
     if not isinstance(source, Source):
         raise ValueError('Asset-only sources require an explicitly selected intact executable source.')
@@ -176,8 +205,13 @@ def prepare(source, destination, progress=lambda message: None):
         temporary.rename(destination)
         return destination
     finally:
-        if temporary.exists():
-            shutil.rmtree(temporary)
+        if temporary.exists() or temporary.is_symlink():
+            import_error = sys.exc_info()[1]
+            try:
+                _remove_private_staging(temporary, destination.parent)
+            except Exception as cleanup_error:
+                detail = f' Original import error: {import_error}' if import_error else ''
+                raise RuntimeError(f'Could not remove private import staging {temporary}: {cleanup_error}.{detail}') from cleanup_error
 
 
 @contextmanager

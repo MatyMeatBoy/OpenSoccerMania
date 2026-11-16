@@ -5,6 +5,7 @@
 
 namespace osm {
 static bool camera_hooks_active=false,timing_hooks_active=false;
+static bool camera_horplus_enabled=false;
 static float engine_aspect=16.f/9.f;
 static double render_limit=240;
 static int camera_zoom_index=0;
@@ -93,7 +94,11 @@ static unsigned long long simulation_steps=0,delta_calls=0;
 static LARGE_INTEGER report_time={},report_frequency={};
 
 static int __cdecl camera_build(void* output,void* camera) {
-    if(camera&&camera_hooks_active&&std::isfinite(engine_aspect)&&engine_aspect>.3f&&engine_aspect<8.f) {
+    // Preserve the unmodified builder path when neither lens feature nor an
+    // authorized isolated camera probe needs temporary source changes.
+    const bool pitch_probe=isolated_camera_probe&&probe_camera_pitch>=-80.f&&probe_camera_pitch<=80.f;
+    if(!camera_horplus_enabled&&camera_zoom_index==0&&!pitch_probe)return original_camera(output,camera);
+    if(camera&&camera_hooks_active&&(!camera_horplus_enabled||(std::isfinite(engine_aspect)&&engine_aspect>.3f&&engine_aspect<8.f))) {
         auto* aspect=reinterpret_cast<float*>(static_cast<unsigned char*>(camera)+0x28);
         auto* fov=reinterpret_cast<int*>(static_cast<unsigned char*>(camera)+0x24);
         if(std::isfinite(*aspect)&&*aspect>.3f&&*aspect<8.f) {
@@ -107,12 +112,13 @@ static int __cdecl camera_build(void* output,void* camera) {
                 if(std::isfinite(distance)&&distance>1.f)lens[5]=lens[2]+distance*std::tan(probe_camera_pitch*3.14159265358979323846f/180.f);
             }
             const double zoom=camera_zoom_index==1?.85:camera_zoom_index==2?.70:1.;
-            *fov=horplus_fov(saved_fov,saved_aspect,engine_aspect,zoom);*aspect=engine_aspect;
+            const auto projection=camera_projection(saved_fov,saved_aspect,engine_aspect,camera_horplus_enabled,zoom);
+            *fov=projection.fov;*aspect=static_cast<float>(projection.aspect);
             static bool reported=false;
-            if(!reported){FILE* file=std::fopen(engine_log,"a");if(file){std::fprintf(file,"CAMERA_HORPLUS original_fov=%d original_aspect=%.6f output_fov=%d output_aspect=%.6f\n",saved_fov,saved_aspect,*fov,*aspect);std::fclose(file);}reported=true;}
+            if(!reported){FILE* file=std::fopen(engine_log,"a");if(file){std::fprintf(file,"CAMERA_PROJECTION horplus=%d original_fov=%d original_aspect=%.6f output_fov=%d output_aspect=%.6f\n",int(camera_horplus_enabled),saved_fov,saved_aspect,*fov,*aspect);std::fclose(file);}reported=true;}
             const int result=original_camera(output,camera);
             ++camera_calls;last_camera_source=camera;
-            if(!isolated_camera_probe&&std::memcmp(source_position,lens,sizeof(source_position)))++camera_position_changes;
+            if(!pitch_probe&&std::memcmp(source_position,lens,sizeof(source_position)))++camera_position_changes;
             if(saved_fov>0&&saved_fov<1980) {
                 const double expected=saved_aspect/std::tan(saved_fov*3.14159265358979323846/3960.);
                 const float actual=std::fabs(*reinterpret_cast<float*>(static_cast<unsigned char*>(camera)+0x138));
@@ -203,7 +209,9 @@ static void start_engine_hooks(const char* directory,const char* config) {
         smooth_interpolation=GetPrivateProfileIntA("Graphics","SmoothInterpolation",1,config)!=0;
         interpolation_hook_active=MH_CreateHook(base+0x1fcd0,reinterpret_cast<void*>(interpolate_frame),reinterpret_cast<void**>(&original_interpolation))==MH_OK;
     }
-    if(GetPrivateProfileIntA("Graphics","ExperimentalHorPlus",0,config)&&std::memcmp(base+0x1ae90,camera_signature,sizeof(camera_signature))==0)
+    camera_horplus_enabled=GetPrivateProfileIntA("Graphics","ExperimentalHorPlus",0,config)!=0;
+    // Install independently of Hor+ so live zoom works in original-framing/4:3 modes.
+    if(std::memcmp(base+0x1ae90,camera_signature,sizeof(camera_signature))==0)
         camera_hooks_active=MH_CreateHook(base+0x1ae90,reinterpret_cast<void*>(camera_build),reinterpret_cast<void**>(&original_camera))==MH_OK;
     render_limit=GetPrivateProfileIntA("Graphics","RenderFPS",240,config);
     if(render_limit<0||render_limit>1000)render_limit=240;

@@ -32,7 +32,17 @@ OpenSoccerMania gives your own game files a new desktop launcher and an incremen
 
 ## Getting started
 
-**Current prerelease: 0.1.0-pre.1 — experimental source snapshot, no standalone installer.** See [scope and verification](docs/releases/0.1.0-pre.1.md).
+**Current prerelease: 0.1.0-pre.2 — experimental Windows portable launcher and source.**
+See [scope and verification](docs/releases/0.1.0-pre.2.md).
+
+For the portable build, download the Windows portable ZIP from
+[the release page](https://github.com/MatyMeatBoy/OpenSoccerMania/releases/tag/v0.1.0-pre.2),
+extract the entire folder to a writable location, and run `OpenSoccerMania.exe`.
+Keep its accompanying files. The launcher includes Python and its dependencies;
+you still supply your own game files and graphics backend. This build targets
+Windows x64; the original game and compatibility bridges remain x86.
+
+For development from source:
 
 You need your own PC game files. Original executables, discs, voices and other game assets are not part of this project's source distribution.
 
@@ -74,6 +84,7 @@ input DLLs are never silently overwritten.
 - Aspect-preserving default presentation. Experimental Hor+ work is incomplete, especially shader-based HUD and cinematic handling.
 - Version-checked Hor+ lens conversion preserves vertical framing; background-layer raster/depth/fog corrections address the black sky, and a separate sprite path addresses tiled-image seams. See [render-layer investigation](docs/render-layer-corrections.md).
 - Generated blue title sidebars for 16:9 and ultrawide, with private edge-color matching for both regional titles. The original 4:3 artwork remains unchanged. See [title artwork and verification](docs/title-branding.md); transition coverage remains experimental.
+- The version-checked stencil shadow composite covers the full output instead of the old 4:3 center; focused GPU tests preserve ordinary HUD centering. Other shadow/effect paths still need scene coverage.
 
 The intended video policy is matching black backgrounds for opening logos, original aspect ratios for cinematics, and integer scaling where practical. HUD elements must keep their shape and adjust to the selected aspect ratio. These are acceptance requirements, not completed feature claims.
 
@@ -87,6 +98,14 @@ VRR, FreeSync and G-SYNC depend on monitor/driver configuration. Activation has 
 ```
 
 These commands run fixture-based Python and native checks without opening the game. Window verification tools start game windows; use the isolated-desktop harness when tests must not interrupt the desktop. Local evidence and game assets stay outside source control.
+
+To build the portable launcher, install `PyInstaller==6.22.3` in the build
+environment and run `tools/build_launcher.ps1` with the LLVM-MinGW path. Its
+candidate folder is `build/portable/OpenSoccerMania/`. Source and portable
+packaging tools inventory every distributed file and refuse to replace an
+existing archive. The explicit `--smoke-test-report <path>` launcher option
+validates bundled resources and opens/closes all four pages using temporary
+preferences, without starting a game.
 
 Native code lives in `native/`; import, guarded patching, configuration and the launcher live in `opensoccermania/`. Version-checked engine hooks separate the render wait from the original simulation rate. English and American modes both selected 50 Hz and were observed near 50 simulation steps/s with rendering above that rate. See [timing evidence](docs/engine-timing.md) and the [work board](docs/WORKBOARD.md) for limits and pending checks.
 

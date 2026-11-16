@@ -31,3 +31,15 @@ The sprite adjustment disables geometry edge MSAA for 2D layers, clamps texture 
 Tests cover the observed shader-handle collision, captured sky depth/rhw values and raster endpoints. Local captures are private under ignored `local/render-evidence/`; no original artwork is included in source. Wider scene coverage, additional GPU backends and all cutscene compositions remain acceptance work.
 
 The identified high-FPS pose rewind is covered by the separate [animation investigation](animation-interpolation.md). Successful sky tests do not establish animation equivalence. A later reporter capture shows a horizontal black sky/horizon band during some pirate-map replay cameras; that case remains open.
+
+## Full-screen stencil-shadow resolve
+
+A remaining old-frame boundary came from a world effect sharing the flat HUD vertex format. The supported executable's stencil-shadow resolve at `0x4c9100` draws a black, alpha-blended full-screen quad from `0x65ba20`, using FVF `0x44`, four 20-byte vertices and a two-triangle strip. Its vertices use depth zero and RHW one. The generic HUD predicate therefore compressed this world resolve into the centered 4:3 area, clipping the visible shadow darkening at that boundary even when the world and stencil geometry extended farther.
+
+The correction recognizes this exact producer using executable instruction signatures, its fixed source address, enabled stencil testing, the full-screen black vertex pattern and the physical backbuffer target. Only that resolve keeps its full output span. Its inclusive source pixel indices are converted to pixel-edge coordinates before raster scaling, covering the first and last physical pixels too. Ordinary HUD quads retain their proportions, and render-texture draws keep their original coordinates. The source vertex data and stencil state are preserved.
+
+An isolated real-game trace confirmed four producer draws with the expected signature, enabled stencil, FVF `0x44`, 640×480 bounds `(0,0)..(639,479)` and color `0x40000000`. The goal-net setup also references the shadow subsystem through calls at `0x4d0322` and `0x4d037f`.
+
+An asset-free GPU regression exercises the production bridge with these inspected producer signatures and vertices placed in unused padding in its own executable image. With the old bridge, the outer pixel remained white (`ffffff`) while the center received the shadow (`bfbfbf`). The corrected bridge shades both, including the first and last pixels at 1920×1080. An ordinary quad with identical depth/RHW still leaves the side area white. A separate render-target control catches accidental backbuffer edge expansion: an intentionally unguarded implementation fails, while the final correction preserves that path. All runs use an isolated desktop; private evidence is under `local/world-effect-evidence/world-stencil-evidence.json`.
+
+This verifies the specific full-screen stencil resolve and the real producer match. Individual map, goal-net and replay compositions still require broader visual acceptance.

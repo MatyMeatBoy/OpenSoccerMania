@@ -557,6 +557,9 @@ class Launcher:
 
 
 def main():
+    if len(sys.argv)==3 and sys.argv[1]=='--smoke-test-report':
+        from .selftest import run
+        raise SystemExit(run(sys.argv[2]))
     root=tk.Tk();Launcher(root);root.mainloop()
 
 

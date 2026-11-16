@@ -58,6 +58,12 @@ int main() {
     assert(!history.prime(new_bytes,old_bytes,sizeof(camera)));
     assert(osm::interpolate_snapshots(&camera_node,new_bytes,old_bytes,.25f));
     assert(camera.aspect==4.f/3&&camera.up==1&&camera.position==25);
+    // Additional saves retain distinct history endpoints and never reseed an
+    // allocated bank. This history object has no presentation/smoothing state.
+    newer.position=60;
+    assert(!history.prime(new_bytes,old_bytes,sizeof(camera)));
+    assert(osm::interpolate_snapshots(&camera_node,new_bytes,old_bytes,.5f));
+    assert(camera.position==40 && older.position==20 && newer.position==60);
     // Reallocation for another match must seed even if allocation addresses
     // are reused. No remembered pointer identity substitutes for this reset.
     history.reset();newer={4.f/3,1,100};
