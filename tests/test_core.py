@@ -33,7 +33,9 @@ class SourceTests(unittest.TestCase):
             dest = root / 'Setup/English/program files/LEGO Media/Soccer Mania'
             dest.mkdir(parents=True)
             (root / 'Game.exe').replace(dest / 'Game.exe')
-            self.assertEqual(discover(root).exe, dest / 'Game.exe')
+            # Windows runners may expose TEMP through an 8.3 alias. Discovery
+            # canonicalizes paths; compare the resolved identity on both sides.
+            self.assertEqual(discover(root).exe, (dest / 'Game.exe').resolve())
 
     def test_zero_executable_rejected(self):
         with tempfile.TemporaryDirectory() as t:
