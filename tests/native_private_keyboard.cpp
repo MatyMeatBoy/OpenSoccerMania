@@ -1,0 +1,20 @@
+#include "../native/input_page.h"
+#include <cassert>
+#include <cstring>
+int main() {
+    char name[96];std::snprintf(name,sizeof(name),"Local\\OpenSoccerMania-Input-%lu",GetCurrentProcessId());
+    HANDLE map=CreateFileMappingA(INVALID_HANDLE_VALUE,nullptr,PAGE_READWRITE,0,272,name);
+    auto* data=static_cast<unsigned char*>(MapViewOfFile(map,FILE_MAP_ALL_ACCESS,0,0,272));assert(data);
+    std::memset(data,0,272);auto* words=reinterpret_cast<DWORD*>(data);
+    words[0]=0x494d534f;words[1]=2;words[2]=1;data[16+MapVirtualKeyW(VK_SPACE,0)]=0x80;
+    {
+        osm::PrivateKeyboard keyboard;
+        assert(keyboard.state(VK_SPACE,false)==0); // Production input never reaches an unfocused game.
+        assert(static_cast<unsigned short>(keyboard.state(VK_SPACE,true))==0x8001);
+        assert(static_cast<unsigned short>(keyboard.state(VK_SPACE,true))==0x8000);
+        words[1]=3;assert(keyboard.state(VK_SPACE,true)==0); // Reject a writer in progress.
+        words[1]=4;words[2]=3;assert((keyboard.state(VK_SPACE,false)&0x8000)!=0); // Explicit private test mode.
+        words[2]=0;assert(keyboard.state(VK_SPACE,true)==0);
+    }
+    UnmapViewOfFile(data);CloseHandle(map);
+}

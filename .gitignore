@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+/build/
+/dist/
+/local/
+/local-*.log
+*.spec
+/ElectronicArts-LegoSoccerMania/
+/lego FOOTBALL MANIA/
+/Lego Football Mania Dutch/
