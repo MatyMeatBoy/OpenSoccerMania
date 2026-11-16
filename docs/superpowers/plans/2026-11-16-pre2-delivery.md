@@ -21,8 +21,11 @@ unverified unless separately exercised.
 - [x] Add portable build recipe and a packaged-launcher smoke entry point that
   validates resources, creates the real UI and shuts down without game imports.
 - [x] Run Python/native checks, affected GPU regressions and isolated packaged UI.
-- [ ] Commit final sources, close/hash archives, validate extracted package,
+- [x] Commit final sources, close/hash archives, validate extracted package,
   publish pre.2 and verify tag, asset digests and prerelease visibility.
 
 The smoke test must use a fresh temporary settings location, preserve existing
 preferences, write a machine-readable report, and avoid starting the game.
+
+Completed after the tagged source snapshot. Final artifact identities and checks
+are recorded in [the verification supplement](../../releases/0.1.0-pre.2-verification.md).
