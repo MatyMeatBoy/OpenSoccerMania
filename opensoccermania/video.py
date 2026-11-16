@@ -32,6 +32,7 @@ class VideoSettings:
     auto_aspect: bool = True
     sprite_seam_fix: bool = True
     modern_presentation: bool = True
+    smooth_interpolation: bool = True
 
     @property
     def window_mode(self):

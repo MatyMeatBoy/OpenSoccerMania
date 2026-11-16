@@ -29,6 +29,14 @@ OptiPort reference: `MatyMeatBoy/OptiPort`, main commit `9673006504bf6712b320da7
 - Passed 22 Python tests, seven native math/ownership/input checks, and hardware-rendered indexed/non-indexed/repeating-texture tests, including fog and binding restoration.
 - New reporter issue: some character animations appear too fast and the goalkeeper shakes at high render rates. Animation-rate/interpolation investigation is open; do not claim 240-FPS gameplay timing acceptance yet.
 
+### Animation boundary correction
+
+- Instrumented the verified animation-advance and pose-evaluation routines: 13 actors each advanced/evaluated once per simulation step, rather than once per rendered frame. The sampler now reads SA states directly and checks executable hashes.
+- Identified the original interpolator's 0.05 boundary threshold, which substitutes coefficient 1 and can rewind the pose on the following render frame. The corrected path preserves the actual coefficient, including zero; it leaves simulation advancement unchanged.
+- Same-process isolated A/B at a 240-FPS requested cap: correction disabled produced 96 rewinds/1800 frames and 26/600; enabled produced 0/1500 and 0/300, correcting 76 and 13 boundary frames. These counters measure interpolation continuity, not a locked-FPS performance result. Logic remained near 50 steps/s.
+- Eight native checks pass, including endpoint continuity, tick-boundary progression, differently sized snapshot records and unchanged input banks. Python checks and native bridge build pass. Full visual acceptance of all animation blends/effects remains pending. See [animation investigation](animation-interpolation.md).
+- GitHub's first CI run exposed a test-path alias mismatch (`RUNNER~1` versus `runneradmin`), not a discovery failure. The installer-tree assertion now compares canonical paths on both sides.
+
 - Measure a controlled match with VSync off and distinguish CPU/render/presentation waits. Do not publish gains from different matches or changed quality settings.
 - Compare real match timer, motion, power-ups and audio at multiple render caps with the original scheduler.
 - Validate resize/maximize, 4:3, 16:9, ultrawide and movie transitions; exercise device reset and clean shutdown.

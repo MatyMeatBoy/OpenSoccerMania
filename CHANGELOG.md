@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Correct the original interpolator's endpoint snap during the first 5% of a tick. Same-process A/B traces recorded 122 within-tick coefficient rewinds in 2400 frames with the old behavior and none in 1800 frames with the correction. Simulation remained near 50 steps/s; this is not a locked-240-FPS result.
+- Add a smooth-interpolation graphics option, version-checked animation diagnostics and a corrected SA-state sampler.
+- Add a native regression for interpolation continuity and snapshot-bank strides.
+- Compare canonical installer paths in tests so Windows 8.3 TEMP aliases work on GitHub runners.
+- Remaining reported issue: a horizontal black sky/horizon band in some replay cameras is under investigation.
+
 ## 0.1.0-pre.1 — 2026-11-16
 
 First public experimental source snapshot for Windows. This is an incremental compatibility and modernization project using the owner's original x86 game, not a completed recompilation.

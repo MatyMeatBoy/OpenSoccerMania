@@ -54,6 +54,7 @@ def configure_bridge(entry,settings):
     config['Graphics']['AutoWindowAspect']=str(int(getattr(settings,'auto_aspect',True)))
     config['Graphics']['SpriteSeamFix']='7' if settings.sprite_seam_fix else '0'
     config['Graphics']['VSync']=str(int(settings.vsync))
+    config['Graphics']['SmoothInterpolation']=str(int(settings.smooth_interpolation))
     config['Game']={'Language':getattr(settings,'language','English').upper()}
     out=io.StringIO();config.write(out)
     path=Path(entry)/'opensoccermania.ini'

@@ -83,7 +83,7 @@ Native code lives in `native/`; import, guarded patching, configuration and the 
 
 The adaptive HUD, per-video scaling, modern controller bridge, performance overlay and high-FPS/simulation comparison are active work. Physical controller compatibility, real ISO import, full-match timing, 4K target allocation and hardware VRR acceptance must be checked before a release claims support.
 
-Some character animations and goalkeeper motion have been reported to look too fast or jittery at high render rates. Animation timing is under investigation; locked 240-FPS gameplay with complete timing equivalence is not yet verified. Development tests can use an isolated Win32 desktop with muted test-process audio and private input, without activating windows on the user's desktop.
+Some character animations and goalkeeper motion were reported to look too fast or jittery at high render rates. Development after pre.1 corrects an identified interpolation-boundary rewind; see [animation evidence](docs/animation-interpolation.md) and the unreleased changelog. Full animation equivalence and locked 240-FPS gameplay remain unverified. Some replay cameras still show a black sky/horizon band. Development tests use an isolated Win32 desktop with muted test-process audio and private input, without activating windows on the user's desktop.
 
 ## Credits
 

@@ -36,6 +36,9 @@ class RuntimeTests(unittest.TestCase):
             self.assertIn('VerifiedExecutable = 1',data)
             self.assertIn('RenderFPS = 360',data)
             self.assertIn('AutoWindowAspect = 0',data)
+            self.assertIn('SmoothInterpolation = 1',data)
+            configure_bridge(Path(t),VideoSettings(smooth_interpolation=False))
+            self.assertIn('SmoothInterpolation = 0',(Path(t)/'opensoccermania.ini').read_text())
     def test_iso_owned_mount_detached_on_import_error(self):
         with tempfile.TemporaryDirectory() as t:
             iso=Path(t)/"player's game.iso";iso.write_bytes(b'fixture')

@@ -1,6 +1,7 @@
 #pragma once
 #include <cmath>
 #include "camera_lens.h"
+#include "interpolation.h"
 
 namespace osm {
 static bool camera_hooks_active=false,timing_hooks_active=false;
@@ -15,6 +16,55 @@ using SimulationStep=void (__cdecl *)();
 static CameraBuild original_camera;
 static FrameDelta original_delta;
 static SimulationStep original_step;
+static SimulationStep original_interpolation;
+static bool smooth_interpolation=true,interpolation_hook_active=false;
+static char engine_config[MAX_PATH];
+static unsigned long long interpolation_frames=0,interpolation_boundary_frames=0;
+static unsigned long long interpolation_rewinds=0;
+static float previous_interpolation_tick=-1,previous_interpolation_alpha=0;
+static void record_interpolation(float effective_alpha) {
+    const float tick=std::floor(*reinterpret_cast<const float*>(0x5e8214));
+    if(tick==previous_interpolation_tick&&effective_alpha+.00001f<previous_interpolation_alpha)++interpolation_rewinds;
+    previous_interpolation_tick=tick;previous_interpolation_alpha=effective_alpha;
+}
+static void __cdecl interpolate_frame() {
+    ++interpolation_frames;
+    const float alpha=*reinterpret_cast<const float*>(0x5e8218);
+    if(timing_hooks_active&&smooth_interpolation&&alpha<=.05f&&valid_interpolation_fraction(alpha)) {
+        const unsigned bank=*reinterpret_cast<const unsigned*>(0x5e8208);
+        auto** banks=reinterpret_cast<unsigned char**>(0x5e8228);
+        auto* node=*reinterpret_cast<InterpolationNode**>(0x5e8220);
+        if(bank<=1&&banks[bank]&&banks[1-bank]) {
+            ++interpolation_boundary_frames;
+            record_interpolation(alpha);
+            if(!interpolate_snapshots(node,banks[bank],banks[1-bank],alpha)) {
+                FILE* file=std::fopen(engine_log,"a");if(file){std::fprintf(file,"INTERPOLATION invalid snapshot chain; boundary dispatch stopped\n");std::fclose(file);}
+            }
+            return;
+        }
+    }
+    record_interpolation(alpha<=.05f?1.f:alpha);
+    original_interpolation();
+}
+using AnimationUpdate=void (__cdecl *)(void*);
+static AnimationUpdate original_animation_advance,original_animation_pose;
+static bool animation_trace_active=false;
+static unsigned long long animation_advances=0,animation_poses=0,animation_repeated_times=0;
+struct AnimationSample {void* state=nullptr;float time=0;};
+static AnimationSample animation_samples[512];
+static void __cdecl animation_advance(void* state) {++animation_advances;original_animation_advance(state);}
+static void __cdecl animation_pose(void* state) {
+    ++animation_poses;
+    if(state) {
+        const float time=*reinterpret_cast<float*>(static_cast<unsigned char*>(state)+0x1c);
+        // Fixed-size diagnostic storage, no allocation in the animation path.
+        for(auto& sample:animation_samples)if(!sample.state||sample.state==state) {
+            if(sample.state&&sample.time==time)++animation_repeated_times;
+            sample.state=state;sample.time=time;break;
+        }
+    }
+    original_animation_pose(state);
+}
 static unsigned long long simulation_steps=0,delta_calls=0;
 static LARGE_INTEGER report_time={},report_frequency={};
 
@@ -55,15 +105,40 @@ static void engine_report() {
     if(seconds<=0)return;
     FILE* file=std::fopen(engine_log,"a");
     if(file){std::fprintf(file,"CLOCK configured_logic_hz=%.6f preserved_wait_rate=%.6f observed_steps=%llu observed_step_hz=%.4f delta_calls=%llu window_seconds=%.4f render_limit=%.1f\n",*legacy_logic_rate,*legacy_wait_rate,simulation_steps,simulation_steps/seconds,delta_calls,seconds,render_limit);std::fclose(file);}
+    if(animation_trace_active) {
+        file=std::fopen(engine_log,"a");if(file){std::fprintf(file,"ANIMATION advances=%llu poses=%llu repeated_pose_times=%llu seconds=%.4f\n",animation_advances,animation_poses,animation_repeated_times,seconds);std::fclose(file);}
+        animation_advances=animation_poses=animation_repeated_times=0;
+    }
+    if(interpolation_hook_active) {
+        file=std::fopen(engine_log,"a");if(file){std::fprintf(file,"INTERPOLATION smooth=%d frames=%llu corrected_boundary_frames=%llu within_tick_rewinds=%llu\n",smooth_interpolation,interpolation_frames,interpolation_boundary_frames,interpolation_rewinds);std::fclose(file);}
+        interpolation_frames=interpolation_boundary_frames=interpolation_rewinds=0;
+        smooth_interpolation=GetPrivateProfileIntA("Graphics","SmoothInterpolation",1,engine_config)!=0;
+    }
     report_time=now;simulation_steps=delta_calls=0;
 }
 static void start_engine_hooks(const char* directory,const char* config) {
     std::snprintf(engine_log,MAX_PATH,"%sopensoccermania-engine.log",directory);
+    std::snprintf(engine_config,MAX_PATH,"%s",config);
     if(!GetPrivateProfileIntA("Graphics","VerifiedExecutable",0,config))return;
     auto* base=reinterpret_cast<unsigned char*>(GetModuleHandleA(nullptr));
+    const unsigned char advance_signature[]={0x56,0x8b,0x74,0x24,0x08,0x8d,0x46,0x18};
+    const unsigned char pose_signature[]={0x81,0xec,0x24,0x01,0x00,0x00,0x53,0x55,0x56};
+    if(GetPrivateProfileIntA("Diagnostics","TraceAnimation",0,config)&&
+       std::memcmp(base+0x15a130,advance_signature,sizeof(advance_signature))==0&&
+       std::memcmp(base+0x15a2a0,pose_signature,sizeof(pose_signature))==0) {
+        const auto a=MH_CreateHook(base+0x15a130,reinterpret_cast<void*>(animation_advance),reinterpret_cast<void**>(&original_animation_advance));
+        const auto b=MH_CreateHook(base+0x15a2a0,reinterpret_cast<void*>(animation_pose),reinterpret_cast<void**>(&original_animation_pose));
+        animation_trace_active=a==MH_OK&&b==MH_OK;
+        if(!animation_trace_active){if(a==MH_OK)MH_RemoveHook(base+0x15a130);if(b==MH_OK)MH_RemoveHook(base+0x15a2a0);}
+    }
     const unsigned char camera_signature[]={0x83,0xec,0x24,0x53,0x8b,0x5c,0x24,0x30};
     const unsigned char delta_signature[]={0x83,0xec,0x28,0x53,0x55,0x56,0x8d,0x44};
     const unsigned char step_signature[]={0xd9,0x05,0x10,0x82,0x5e,0x00,0x8b,0x0d};
+    const unsigned char interpolation_signature[]={0x51,0xd9,0x05,0x14,0x82,0x5e,0x00,0x53,0x56};
+    if(std::memcmp(base+0x1fcd0,interpolation_signature,sizeof(interpolation_signature))==0) {
+        smooth_interpolation=GetPrivateProfileIntA("Graphics","SmoothInterpolation",1,config)!=0;
+        interpolation_hook_active=MH_CreateHook(base+0x1fcd0,reinterpret_cast<void*>(interpolate_frame),reinterpret_cast<void**>(&original_interpolation))==MH_OK;
+    }
     if(GetPrivateProfileIntA("Graphics","ExperimentalHorPlus",0,config)&&std::memcmp(base+0x1ae90,camera_signature,sizeof(camera_signature))==0)
         camera_hooks_active=MH_CreateHook(base+0x1ae90,reinterpret_cast<void*>(camera_build),reinterpret_cast<void**>(&original_camera))==MH_OK;
     render_limit=GetPrivateProfileIntA("Graphics","RenderFPS",240,config);

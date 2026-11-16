@@ -177,6 +177,7 @@ class Launcher:
         self.auto_aspect=tk.BooleanVar(value=saved.get('auto_aspect',True))
         self.sprite_seam_fix=tk.BooleanVar(value=saved.get('sprite_seam_fix',True))
         self.modern_presentation=tk.BooleanVar(value=saved.get('modern_presentation',True))
+        self.smooth_interpolation=tk.BooleanVar(value=saved.get('smooth_interpolation',True))
         card=ttk.LabelFrame(frame,text=' DISPLAY & IMAGE QUALITY ',padding=18);card.pack(fill='x')
         for row,(label,var,values) in enumerate([('Internal render resolution',self.res,RESOLUTIONS),('Fullscreen refresh rate (Hz)',self.hz,list(map(str,REFRESH_RATES))),('Antialiasing',self.aa,list(AA_MODES)),('Texture filtering',self.filter,list(FILTER_MODES))]):
             ttk.Label(card,text=label).grid(row=row,column=0,sticky='w',padx=(0,30),pady=8)
@@ -197,6 +198,7 @@ class Launcher:
         ttk.Checkbutton(card,text='Adapt Hor+ camera to the window shape',variable=self.auto_aspect).grid(row=13,columnspan=2,sticky='w',pady=6)
         ttk.Checkbutton(card,text='Fix seams in menus and tiled images',variable=self.sprite_seam_fix).grid(row=15,columnspan=2,sticky='w',pady=6)
         ttk.Checkbutton(card,text='Low-latency presentation',variable=self.modern_presentation).grid(row=16,columnspan=2,sticky='w',pady=6)
+        ttk.Checkbutton(card,text='Smooth animation interpolation at high FPS',variable=self.smooth_interpolation).grid(row=17,columnspan=2,sticky='w',pady=6)
         ttk.Label(card,text='F11 / Alt+Enter: toggle Windowed and Borderless. The render limit preserves the original simulation rate on verified executable versions. VSync can limit FPS to your display refresh. Windowed and borderless modes use the desktop refresh rate.',style='Muted.TLabel',wraplength=730).grid(row=14,columnspan=2,sticky='w',pady=(8,0))
         ttk.Button(frame,text='Save graphics profile',style='Accent.TButton',command=self.save_video).pack(anchor='w',pady=18)
         ttk.Label(frame,text='VRR · FreeSync · G-SYNC',style='Heading.TLabel').pack(anchor='w',pady=(5,5))
@@ -314,6 +316,7 @@ class Launcher:
             settings.auto_aspect=self.auto_aspect.get()
             settings.sprite_seam_fix=self.sprite_seam_fix.get()
             settings.modern_presentation=self.modern_presentation.get()
+            settings.smooth_interpolation=self.smooth_interpolation.get()
             if self.entry:
                 config=child(self.entry,'dgVoodoo.conf')
                 wrapper=child(self.entry,'d3d8.dll')

@@ -22,4 +22,4 @@ The sprite adjustment disables geometry edge MSAA for 2D layers, clamps texture 
 
 Tests cover the observed shader-handle collision, captured sky depth/rhw values and raster endpoints. Local captures are private under ignored `local/render-evidence/`; no original artwork is included in source. Wider scene coverage, additional GPU backends and all cutscene compositions remain acceptance work.
 
-Character-animation speed and goalkeeper jitter at high render rates are a separate open timing issue. Successful sky or image tests do not establish animation equivalence.
+The identified high-FPS pose rewind is covered by the separate [animation investigation](animation-interpolation.md). Successful sky tests do not establish animation equivalence. A later reporter capture shows a horizontal black sky/horizon band during some pirate-map replay cameras; that case remains open.

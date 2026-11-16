@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $outputDir = Join-Path $projectRoot 'build\tests'
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
-foreach ($name in @('aspect','frame_stats','layout','screen_vertices','camera_lens','buffer_mirror','private_keyboard')) {
+foreach ($name in @('aspect','frame_stats','layout','screen_vertices','camera_lens','buffer_mirror','private_keyboard','interpolation')) {
     $executable = Join-Path $outputDir "$name.exe"
     & "$Toolchain\bin\i686-w64-mingw32-clang++.exe" -std=c++17 -O2 -Wall -Wextra -static "$projectRoot\tests\native_$name.cpp" -o $executable
     if ($LASTEXITCODE -ne 0) { throw "Compilation failed: $name" }

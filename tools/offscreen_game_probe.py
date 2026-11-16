@@ -35,7 +35,7 @@ def main(fps=60,duration=240):
     if mania.resolve()!=(source/'Mania').resolve():raise ValueError('Unexpected test-data junction.')
     settings=VideoSettings(horplus=True,display_mode='Windowed',vsync=False,render_fps=0)
     configure_bridge(entry,settings)
-    config=entry/'opensoccermania.ini';config.write_text(config.read_text()+f'\n[Diagnostics]\nIsolateInstance=1\nProbeFPS={fps}\n')
+    config=entry/'opensoccermania.ini';config.write_text(config.read_text()+f'\n[Diagnostics]\nIsolateInstance=1\nTraceAnimation=1\nProbeFPS={fps}\n')
     conf=entry/'dgVoodoo.conf';conf.write_text(configure_wrapper(conf.read_text(),settings))
     stop=evidence/'stop.request'
     if stop.exists():stop.unlink()
