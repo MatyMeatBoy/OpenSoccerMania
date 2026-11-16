@@ -47,7 +47,7 @@ class BackendTests(unittest.TestCase):
     def test_find_owned_backup_and_preserve_sources(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp); entry, dll, conf = private(root, 'donor', own=True)
-            self.assertEqual(find_library_backend(root), (dll, conf))
+            self.assertEqual(find_library_backend(root), (dll.resolve(), conf.resolve()))
             destination = root / 'new'; destination.mkdir()
             (destination / 'opensoccermania-source.json').write_text('{}')
             before = dll.read_bytes(), conf.read_bytes()
