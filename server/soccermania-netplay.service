@@ -1,0 +1,18 @@
+[Unit]
+Description=SoccerMania room and input relay
+After=network.target
+
+[Service]
+Type=simple
+User=soccermania
+WorkingDirectory=/opt/soccermania
+ExecStart=/usr/bin/python3 -m opensoccermania.netplay.server --bind 0.0.0.0 --port 27845 --cert /etc/soccermania/fullchain.pem --key /etc/soccermania/private.key
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/opt/soccermania
+
+[Install]
+WantedBy=multi-user.target
