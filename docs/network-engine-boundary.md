@@ -155,3 +155,58 @@ DLL and analyzer; captures are under
 `local/acceptance-2026-11-17/network-completion/`. Synchronous diagnostic I/O can
 affect timing. No normal-play performance, skipped-path frequency, identical
 initial-state or synchronized-online result is accepted by this trace.
+
+## Active play and separate snapshot registries
+
+A second private source-copy probe enables bounded windows on demand, after
+visual phase confirmation. Four virtual pads enter Quick Start; captures show
+kickoff, then changed player positions after directional/button input. Two
+post-kickoff windows, enabled at approximately 202.2 and 237.3 elapsed seconds,
+record 512 complete sequences each (1024 total). All use `0x456260` on one thread,
+with one common seed-counter increment per sequence. In 245 sequences the RNG
+at mode return differs from common return. Neither skipped dispatch nor the
+early-return branch is observed. Later keyboard/Start attempts do not establish
+a pause; the second window is ordinary post-kickoff observation, not pause-path
+acceptance. No frame-rate claim follows from synchronous trace I/O.
+
+Read-only inventories during introduction and post-kickoff find the same
+16-node interpolation chain at `0x5e8220`. Each node's registered byte count is
+at `+0x14`; its sum equals allocation size `0x5e8230 == 6211`:
+
+| Save / interpolation callback | Instances | Registered bytes each |
+| --- | ---: | ---: |
+| `0x4ce280` / `0x4ce2d0` | 13 | 424 |
+| `0x4c9480` / `0x4c94a0` | 2 | 120 |
+| `0x406d70` / `0x406d90` | 1 | 459 |
+
+Fresh disassembly proves two concrete obstacles to hashing this bank directly
+across processes. Save `0x4ce280` copies its object's first 120 bytes, including
+pointer fields at `+0x64` and `+0x74`, then copies data reached through those
+fields. An external read confirms both bank copies retain those exact pointers
+for the first node. They are process-local addresses, not stable logical IDs.
+The final callback `0x406d70` copies only 456 bytes while its size routine returns
+459; its return stride is `459 >> 2 == 114` words. With the preceding observed
+sizes, the final three allocation bytes are not written by these save callbacks.
+Their content is not established as logical game state. This finding does not
+justify changing original allocation or callback strides.
+
+The compact control callbacks `0x485620` / `0x4856c0` belong to a separate
+28-byte-node registry populated by `0x480fb0`, with head `0x633308` and next
+at node offset `+0x10`. That head reads zero in the three later retained inventories
+(`both-registries-inventory.json`, `active-callback-inventory.json` and
+`final-callback-inventory.json`). The control callbacks are absent from the active
+16-node interpolation chain. Static existence of their setup does not prove
+that compact control restoration occurs in this normal Quick Start path.
+Other modes and the lifecycle of that separate registry remain to be traced.
+
+Consequently, complete initial-state/checksum work must use verified logical
+fields and the actual mode's state ownership. Normalizing these two pointers
+alone would not prove complete authoritative state coverage or cross-process
+determinism. The run closes with exit zero, unchanged input desktop and all
+three copied save hashes unchanged. Private evidence:
+`local/netplay-state-2026-11-17/summary.json`, `completion.trace`,
+`intro-callback-inventory.json`, `active-callback-inventory.json`,
+`final-callback-inventory.json`, fresh callback/registry disassemblies and
+source-copy DLL. Captures are under
+`local/acceptance-2026-11-17/network-state/`. Production input, scheduler, seeds
+and published pre.7 binaries are unchanged.

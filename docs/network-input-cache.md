@@ -34,16 +34,21 @@ This is separate from the raw DirectInput cache and its polling frequency.
 
 ## Snapshot ownership
 
-The engine registers save `0x485620` and restore `0x4856c0` at `0x48023a` /
-`0x48023f`. The snapshot has an eight-byte shared header and eleven bytes per
+The inspected setup pushes restore `0x4856c0` at `0x48023a` and save
+`0x485620` at `0x48023f`, then calls registrar `0x480fb0` at `0x48024e`. The snapshot has an eight-byte shared header and eleven bytes per
 control: angle high nibble/low byte, magnitude byte, then low/high bytes for
 current, pressed, released and previous masks. Upper action-mask bits, source
 identity and other record fields are not all carried by this compact layout.
 It is not a lossless serialization of the whole control object.
 
-This snapshot restoration means raw-poll and edge-update observations cannot be
-used alone to assume high-FPS button loss or a safe network injection location.
-The relevant native callback ownership must be preserved by an eventual adapter.
+These callbacks show a compact serialization/restoration capability, not that
+restoration runs in every normal match. A later read-only inventory finds this
+registrar's list head at `0x633308` empty in the selected Quick Start run; the
+active interpolation list at `0x5e8220` contains different callbacks. See
+[separate registries](network-engine-boundary.md#active-play-and-separate-snapshot-registries).
+Raw-poll and edge-update observations alone still do not establish high-FPS
+button loss or a safe network injection location. An adapter must verify the
+callback paths actually used in its supported modes.
 
 ## Active-match trace
 

@@ -5,6 +5,17 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.7. See
 
 ## Continuation verification, 2026-11-17
 
+- Demand-triggered post-kickoff tracing verifies 1024 complete update/save
+  sequences; 245 show RNG use after common return inside the mode dispatcher.
+  The active interpolation chain has 16 nodes totaling 6211 registered bytes;
+  copied process pointers and three bytes outside the final callback's writes
+  make a whole-bank hash unsuitable as an authoritative cross-process checksum.
+  Compact control serialization belongs to a different registry, observed empty
+  in this run; earlier callback documentation now distinguishes capability from
+  active restoration. Clean close, input desktop and three save hashes verify.
+  See [active state ownership](network-engine-boundary.md#active-play-and-separate-snapshot-registries)
+  and `local/netplay-state-2026-11-17/summary.json`. Full logical-state coverage,
+  identical setup and playable synchronization remain open.
 - A private completion probe records 384 complete marker/mode/common/return/save
   sequences on one thread. All sampled calls use one dispatcher with no skipped
   update or early return. The first iteration resets its raw tick from 1 to 0
