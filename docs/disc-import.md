@@ -156,3 +156,33 @@ fails, its staging path and the original import error are reported together;
 cleanup errors are not suppressed. Focused Windows tests reproduce a real
 post-copy import failure with read-only input, verify original hashes/attributes,
 and verify staging removal and junction refusal.
+
+## Read-only executables and interrupted startup patches (pre.4)
+
+ISO media can mark Game.exe read-only. Its copied private executable can retain
+that flag even though the library directory is writable. Startup patching now
+retries replacement after clearing only that private executable's read-only bit.
+It requires the private import provenance, rejects symlinks/reparse points and
+extra hard links, and checks separation from both recorded original sources.
+Owner source files, private original backups and Windows ACL permissions are not
+changed. Normal read-only copies do not require administrator privileges.
+
+A failed executable replacement leaves a verified original backup and a complete
+recovery record. Retrying the import accepts either the exact original bytes or
+the exact derived patched bytes; an original executable plus a valid pending
+record resumes safely. Old valid records from the interrupted import are upgraded
+when retried. Every application/restoration validates the backup, expected edits
+and derived hashes; a foreign executable, corrupt backup or inconsistent record
+is refused. Restoration can also be retried after interruption. Existing backup
+bytes are never overwritten. A genuine permission/sharing failure reports the
+private path and advises closing the game/checking that private folder, while
+preserving the state needed for retry. Deleting the complete local library is not
+needed to recover a valid interrupted patch.
+
+A disposable pre.4 check also used the two actual intact owner executables without
+copying or launching the game data. Read-only private copies underwent an injected
+replacement denial, legacy-record recovery, repeated application and restoration.
+Both original executable hashes and Windows attributes remained unchanged, as did
+the private original backup bytes; all disposable copies were removed. The ignored
+summary is `local/pre4-patch-validation.json`. This verifies patch transactions,
+not gameplay or acceptance on the reporting PC.
