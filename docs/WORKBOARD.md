@@ -5,6 +5,18 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.6. See
 
 ## Continuation verification, 2026-11-17
 
+- Inspected the engine/network boundary instead of routing relay frames through
+  an assumed tick callback. `0x41fc70` only advances clock/snapshot bank; its sole
+  inspected call is inside the pending-step loop, while device update runs in
+  the outer loop. The iteration backedge bypasses that poll. A private source-copy
+  trace records 2048 successful pad reads and 512 marker calls on one thread;
+  pad 0 has two reads at 77 tick values. Thus the current latest-state mailbox is
+  not a confirmed per-step input gate. The selected phase includes map/player
+  introduction and kickoff, not a moving-play determinism comparison. Clean
+  close is exit zero, input desktop unchanged and copied saves remain identical.
+  Evidence: `local/netplay-boundary-2026-11-17/summary.json`. No production binary
+  or scheduling behavior changed. See [boundary findings](network-engine-boundary.md)
+  for the cached-state/edge, initial-state/RNG and scheduler checks still needed.
 - Added a host-controlled return from started/interrupted transport sessions to
   the same room's lobby. The request requires its matching session ID, so delayed
   old stop commands cannot cancel a later round. Readiness, frame counters and

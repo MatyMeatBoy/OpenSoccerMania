@@ -15,3 +15,13 @@ For recognized executable hashes and matching function signatures, the bridge in
 Startup, gameplay and clean shutdown passed with this bridge. Initial navigation samples stayed in menus and correctly recorded zero simulation steps. Subsequent active-game samples observed approximately 50 simulation steps per second with rendering around 140 FPS and VSync enabled. English and American both retained a configured 50 Hz rate; American selected `Software\LEGO Media\Soccer Mania` and the Soccer title assets. This is a comparison of region modes in the supplied executable, not proof about an independently dumped American executable.
 
 The fastest currently verified original selection is therefore **50 Hz**. No 60 or 59.94 Hz original simulation path has been established. Full match-timer, audio and long-session equivalence across render caps remain acceptance work. Local machine-readable samples and native logs are kept under ignored `local/timing-evidence/`.
+
+## Meaning of the step marker
+
+Further control-flow inspection identifies `0x41fc70` as the clock/interpolation
+bank advance within the original pending-step loop. The measured marker rate
+still identifies that loop's steady-state iteration rate; the function itself
+is not the full simulation update. Device polling occurs earlier in the outer
+loop and is not one-to-one with marker calls. See the
+[network boundary investigation](network-engine-boundary.md) before using this
+hook for frame-tagged input or deterministic replay.
