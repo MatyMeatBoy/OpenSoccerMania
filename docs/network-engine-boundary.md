@@ -197,7 +197,11 @@ at node offset `+0x10`. That head reads zero in the three later retained invento
 `final-callback-inventory.json`). The control callbacks are absent from the active
 16-node interpolation chain. Static existence of their setup does not prove
 that compact control restoration occurs in this normal Quick Start path.
-Other modes and the lifecycle of that separate registry remain to be traced.
+Follow-up [logical-registry tracing](network-replay-state.md) resolves that
+lifecycle: initialization consumes the staging list into three persistent
+lists, and 96 actual compact control-save returns are observed. An additional
+inner control-refresh path also precedes original recording. Complete state
+coverage, other modes and cross-process restoration remain unverified.
 
 Consequently, complete initial-state/checksum work must use verified logical
 fields and the actual mode's state ownership. Normalizing these two pointers

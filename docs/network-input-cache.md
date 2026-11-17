@@ -41,14 +41,19 @@ current, pressed, released and previous masks. Upper action-mask bits, source
 identity and other record fields are not all carried by this compact layout.
 It is not a lossless serialization of the whole control object.
 
-These callbacks show a compact serialization/restoration capability, not that
-restoration runs in every normal match. A later read-only inventory finds this
-registrar's list head at `0x633308` empty in the selected Quick Start run; the
-active interpolation list at `0x5e8220` contains different callbacks. See
-[separate registries](network-engine-boundary.md#active-play-and-separate-snapshot-registries).
-Raw-poll and edge-update observations alone still do not establish high-FPS
-button loss or a safe network injection location. An adapter must verify the
-callback paths actually used in its supported modes.
+These callbacks show a compact serialization/restoration capability. The
+initially observed empty head at `0x633308` is a staging list that initialization
+consumes into three persistent lists. A follow-up probe verifies the sole
+bucket-1 node uses these control callbacks and records 96 actual control-save
+returns; no restore call is observed in that run. The six-control meaningful
+payload is 74 bytes and its reserved/returned stride is 76 bytes, including two
+bytes not written by the callback. This registry is separate from the active
+interpolation list at `0x5e8220`. See [logical serialization](network-replay-state.md).
+
+There is also an inner refresh path: `0x480650 -> 0x480620 -> 0x485560`, before
+original frame recording. Surviving to the clock marker alone does not prove a
+press edge reaches that recording or actor consumption. An adapter must verify
+the actual mode's refresh, recording and restoration paths.
 
 ## Active-match trace
 

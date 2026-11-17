@@ -5,6 +5,16 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.7. See
 
 ## Continuation verification, 2026-11-17
 
+- Resolved the logical registry lifecycle: the empty head was consumed staging
+  metadata. All 24 captured registrations match three persistent lists containing
+  18/1/5 nodes. Bounded real-game traces record 96 save-dispatch and 96 control-save
+  returns, including the six-control 74-byte payload with a 76-byte return stride.
+  No restore event is observed. Fresh control flow also identifies an inner
+  per-step control refresh before recording, so edge survival to the clock marker
+  alone is not acceptance of actor-consumed input. Clean close, unchanged input
+  desktop and copied save hashes verify. See [logical serialization](network-replay-state.md)
+  and `local/netplay-registry-2026-11-17/summary.json`. Identical initial-state,
+  complete logical coverage, input gating and playable online remain open.
 - Demand-triggered post-kickoff tracing verifies 1024 complete update/save
   sequences; 245 show RNG use after common return inside the mode dispatcher.
   The active interpolation chain has 16 nodes totaling 6211 registered bytes;
