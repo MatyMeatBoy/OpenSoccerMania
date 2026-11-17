@@ -16,7 +16,7 @@
 - [x] Add Auto/Xbox360/PS4/SwitchPro/SteamDeck preference to launcher/settings/runtime. Rename Xbox-only UI wording, retain old on/off settings, and show matching controls labels/preview with correct positional names.
 - [x] Implement shared native glyph loading and use it for original menu prompt replacement and F1 footer. Add a live family selector; release/recreate cached textures correctly on style/device changes.
 - [x] Run focused Python and native tests, GPU prompt fixtures for all families, isolated frozen launcher QA and actual private-game screenshots. Verify fallback when assets/metadata are invalid. No foreground desktop switching or physical-controller claims from virtual fixtures.
-- [ ] Review, integrate and publish a new verified baseline if release gates pass. Original broader game/network requirements stay active.
+- [x] Review, integrate and publish a new verified baseline if release gates pass. Original broader game/network requirements stay active.
 
 ## Files
 
@@ -47,3 +47,5 @@ A family selector and glyphs are not proof that a physical DualShock/Switch devi
 - Ruling: existing user authorization covers integration/publication of successive
   baselines; proceed through final archive checks without another approval menu.
   Broader game/network requirements stay active.
+
+- Published pre.8 from `899fd96a84d2efe4528ecc30621f22760b8d9333` after exact-DLL checks, CI, extracted-source tests and extracted frozen smoke. Source/portable inventories and all four public download hashes match.

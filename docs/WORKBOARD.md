@@ -1,9 +1,20 @@
 # OpenSoccerMania work board
 
-Updated: 2026-11-17. Current candidate: 0.1.0-pre.8; published baseline: 0.1.0-pre.7. See
+Updated: 2026-11-17. Current published baseline: 0.1.0-pre.8. See
 [pre.8 scope and limits](releases/0.1.0-pre.8.md).
 
 ## Controller-family baseline, 2026-11-17
+
+- Published [pre.8](https://github.com/MatyMeatBoy/OpenSoccerMania/releases/tag/v0.1.0-pre.8)
+  from exact source/tag target `899fd96a84d2efe4528ecc30621f22760b8d9333`.
+  CI run 44197330911 succeeds. Source ZIP has 306 inventoried members and SHA-256
+  `bdb4798f05f7cb3fe3af3e78b16577f5d0bb1fe34c3b5a8d19165449475d16ac`;
+  Windows ZIP has 1089 members and SHA-256
+  `5e373c781c665442e1be3fcc2ef4b37e4770eef2d02e0bf4e5c72d345bc36371`.
+  Extracted source passes 148 Python tests (two environment/owner-data skips);
+  extracted frozen launcher passes all four preview/import/resource checks.
+  Both inventories and all four public downloads match their recorded hashes.
+  Earlier pre.7 tag still resolves to `7dbdec65f5e7543403a124a4f1f44e92d6965651`.
 
 - Implemented Xbox 360, PlayStation 4, Switch Pro and Steam Deck visual families
   with SDL type detection, Auto/manual style, positional labels and licensed CC0
@@ -20,7 +31,7 @@ Updated: 2026-11-17. Current candidate: 0.1.0-pre.8; published baseline: 0.1.0-p
   test ACLs are restored. `local/release-verification/pre8-build/` records these
   checks. Final source passes 148 Python tests (one privilege skip), 22 named
   native CPU checks and 31 GPU/input/import cases using the exact frozen DLL.
-  Final archive/publication checks follow below when completed.
+  Final archive/publication checks are recorded above.
 - OptiPort's reusable PC-modding, presentation-clock, licensed-controller-asset
   and logical-state audit methods are integrated in
   [OptiPort PR27](https://github.com/MatyMeatBoy/OptiPort/pull/27), canonical main
