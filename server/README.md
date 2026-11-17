@@ -20,6 +20,8 @@ For an Internet endpoint use `--cert fullchain.pem --key private.key`, and give 
 
 ## Client API
 
+Transport protocol 2 is required; protocol-1 peers fail the hello handshake because they lack session-isolation semantics. See [connection/session lifecycle](../docs/network-transport.md).
+
 ```python
 from opensoccermania.netplay import Compatibility, NetplayClient
 
@@ -40,7 +42,7 @@ await client.close()
 
 The controller/keyboard adapter maps each person's device to their own client/seat and the normalized values. No device is shared over OS keyboard events. Axis values are signed integers -32767..32767; buttons is a 16-bit mask whose action mapping must be agreed by the future engine adapter/rules version. Frames are integer tags supplied by that adapter, not server wall-clock timestamps. A client's event queue holds 512 notifications; applications must consume it continuously or the client disconnects. Timeline retains 240 distinct frames, rejects stale per-seat events and never invents missing input.
 
-Store `client.identity` privately while reconnecting. A new connected client calls `await new_client.resume(identity, compat)` within the default 15-second disconnected-seat lease. Identity/player/seat remain stable. Tokens appear only in that client's join/resume reply, never in room/input broadcasts. An active connection cannot be displaced using a token. Server restart loses every room and token; callers must explicitly create a new lobby, never silently resume an old game. Reconnect recovers the reservation, not game state. A disconnect during a started session changes it to `interrupted` permanently; create another lobby after all old reservations expire. No unsafe resumption is attempted.
+Store `client.identity` privately while reconnecting. A new connected client calls `await new_client.resume(identity, compat)` within the default 15-second disconnected-seat lease. Identity/player/seat remain stable. Tokens appear only in that client's join/resume reply, never in room/input broadcasts. An active connection cannot be displaced using a token. Server restart loses every room and token; callers must explicitly create a new lobby, never silently resume an old game. Reconnect recovers the reservation, not game state. A disconnect during a started session changes it to `interrupted`; simulation does not resume automatically. The current host may call `await client.request("lobby", session=session_id)` for that started/interrupted session. A matching session ID is required, so an old stop command cannot cancel a newer round. Seats and leases remain, while readiness, frame counters and confirmed input are cleared. Every participant must reconnect if needed and explicitly ready again before a fresh transport session can start. No engine-state recovery is attempted.
 
 ## Wire contract and bounds
 

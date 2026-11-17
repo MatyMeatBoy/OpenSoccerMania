@@ -114,6 +114,94 @@ class NetworkTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises((NetplayError, ConnectionError)):
             await clients[1].request("ping")
 
+    async def test_host_can_return_to_lobby_and_start_fresh_session(self):
+        clients = await self.players()
+        event_queues = [c.events for c in clients]
+        for client in clients:
+            await client.request("ready", ready=True)
+        old_session = (await clients[0].request("start"))["session"]
+        for client in clients:
+            await client.request("input", session=old_session, frame=0,
+                                 input={"x": 111, "y": 0, "buttons": 1})
+        await self.wait_until(lambda: all(c.timeline.complete(0, range(4)) for c in clients))
+        with self.assertRaisesRegex(NetplayError, "host required"):
+            await clients[1].request("lobby", session=old_session)
+        with self.assertRaisesRegex(NetplayError, "inactive session"):
+            await clients[0].request("lobby", session="wrong")
+        await clients[0].request("lobby", session=old_session)
+        room = self.server.rooms["test"]
+        self.assertEqual((room.state, room.session), ("lobby", ""))
+        self.assertTrue(all(not p.ready and p.last_frame == -1 for p in room.players.values()))
+        await self.wait_until(lambda: all(c.session is None and not c.timeline.frames for c in clients))
+        for client, queue in zip(clients, event_queues):
+            self.assertIs(client.events, queue)
+            while not queue.empty():
+                notice = queue.get_nowait()
+                self.assertNotEqual(notice.get("event"), "input")
+                queue.task_done()
+            await asyncio.wait_for(queue.join(), 1)
+        with self.assertRaisesRegex(NetplayError, "inactive session"):
+            await clients[0].request("input", session=old_session, frame=1,
+                                     input={"x": 0, "y": 0, "buttons": 0})
+        with self.assertRaisesRegex(NetplayError, "barrier"):
+            await clients[0].request("start")
+        for client in clients:
+            await client.request("ready", ready=True)
+        new_session = (await clients[0].request("start"))["session"]
+        self.assertNotEqual(new_session, old_session)
+        with self.assertRaisesRegex(NetplayError, "inactive session"):
+            await clients[0].request("lobby", session=old_session)
+        self.assertEqual(room.session, new_session)
+        for client in clients:
+            await client.request("input", session=new_session, frame=0,
+                                 input={"x": -222, "y": 0, "buttons": 2})
+        await self.wait_until(lambda: all(c.timeline.complete(0, range(4)) for c in clients))
+        for client in clients:
+            self.assertEqual(client.session, new_session)
+            self.assertEqual(client.timeline.complete(0, range(4)),
+                             {seat: {"x": -222, "y": 0, "buttons": 2} for seat in range(4)})
+            while not client.events.empty():
+                client.events.get_nowait()
+                client.events.task_done()
+        # A delayed old-session relay must not advance the new timeline or reach
+        # input consumers, even if its frame number is larger than the new one.
+        await self.server._broadcast(room, dict(event="input", session=old_session,
+            player=clients[0].identity["player"], seat=0, frame=100,
+            input={"x": 999, "y": 0, "buttons": 0}))
+        for client in clients:
+            await client.request("ping")  # FIFO response observes the preceding relay.
+            self.assertEqual(client.timeline.latest[0], 0)
+            self.assertTrue(client.events.empty())
+        await clients[0].request("input", session=new_session, frame=1,
+                                 input={"x": 333, "y": 0, "buttons": 0})
+        await self.wait_until(lambda: all(c.timeline.latest.get(0) == 1 for c in clients))
+
+    async def test_interrupted_room_returns_to_lobby_without_bypassing_ready_barrier(self):
+        clients = await self.players()
+        for client in clients:
+            await client.request("ready", ready=True)
+        interrupted_session = (await clients[0].request("start"))["session"]
+        self.control_server_clock()
+        identity = clients[3].identity.copy()
+        player = self.server.rooms["test"].players[identity["player"]]
+        await clients[3].close()
+        await self.wait_until(lambda: player.connection is None)
+        self.assertEqual(self.server.rooms["test"].state, "interrupted")
+        await clients[0].request("lobby", session=interrupted_session)
+        for client in clients[:3]:
+            await client.request("ready", ready=True)
+        with self.assertRaisesRegex(NetplayError, "barrier"):
+            await clients[0].request("start")
+        replacement = await self.client()
+        await replacement.resume(identity, COMPAT)
+        with self.assertRaisesRegex(NetplayError, "barrier"):
+            await clients[0].request("start")
+        await replacement.request("ready", ready=True)
+        session = (await clients[0].request("start"))["session"]
+        self.assertTrue(session)
+        with self.assertRaisesRegex(NetplayError, "not in lobby"):
+            await clients[0].request("ready", ready=True)
+
     async def test_closed_client_reconnect_starts_with_clean_session_state(self):
         pair = [await self.client() for _ in range(2)]
         for seat, client in enumerate(pair):
@@ -270,8 +358,9 @@ class NetworkTests(unittest.IsolatedAsyncioTestCase):
         writer.close()
         await writer.wait_closed()
         first = await self.client()
-        with self.assertRaisesRegex(NetplayError, "protocol mismatch"):
-            await first.request("hello", version=999)
+        for old_version in (1, 999):
+            with self.assertRaisesRegex(NetplayError, "protocol mismatch"):
+                await first.request("hello", version=old_version)
         self.server.max_rooms = 1
         await first.join("one", COMPAT)
         other = await self.client()

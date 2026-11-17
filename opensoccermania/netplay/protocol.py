@@ -5,7 +5,7 @@ import json
 import struct
 from dataclasses import dataclass
 
-VERSION = 1
+VERSION = 2
 MAX_MESSAGE = 8192
 
 @dataclass(frozen=True)

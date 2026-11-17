@@ -5,6 +5,24 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.6. See
 
 ## Continuation verification, 2026-11-17
 
+- Added a host-controlled return from started/interrupted transport sessions to
+  the same room's lobby. The request requires its matching session ID, so delayed
+  old stop commands cannot cancel a later round. Readiness, frame counters and
+  relay budget reset; seats, reconnect credentials and disconnected leases stay.
+  A fresh start still requires every reserved participant connected/ready and
+  both teams represented. Client session transitions/end/disconnect clear the
+  confirmed timeline and queued input while preserving event-queue identity and
+  noninput notices. Old-session relays cannot advance the new timeline.
+- Transport protocol 2 rejects older peers lacking those lifecycle semantics.
+  Real-socket tests complete two rounds in one four-seat room with distinct
+  frame-zero inputs, reject an injected delayed old frame 100, and accept the
+  new frame one. The interrupted-room case requires the missing player to resume
+  and ready before restart. Wrong/old lobby session-ID cases fail before their
+  guard and pass afterward. All 16 network cases and 135 aggregate Python tests
+  pass (one privilege skip); review found no actionable code issues and the old
+  permanent-interruption instruction in server docs was corrected. Evidence:
+  `local/release-verification/pre6-build/return-lobby-scoped-*.log`. This is
+  transport lifecycle verification, not playable synchronized game recovery.
 - Fixed reusable network-client lifecycle failures. A closed client's new
   connect previously retained `disconnected`, so its hello failed with connection
   lost. New streams now start with fresh events/timeline/identity and preserve

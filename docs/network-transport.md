@@ -3,7 +3,8 @@
 This is a four-seat, two-team room and input-relay foundation. It does not yet
 synchronize the original game simulation or provide playable online matches.
 The server marks engine integration as pending; interrupted games do not resume
-simulation automatically. A started room has no verified return-to-lobby flow.
+simulation automatically. The transport can return a started/interrupted room
+to its lobby, but it does not restore or restart engine state.
 
 ## Reusing a client
 
@@ -13,7 +14,8 @@ finished. A live or currently opening connection rejects a second call with
 
 After new streams open, per-connection state is fresh: the disconnected marker
 is cleared, identity is unseated (`None`), and new event-queue and timeline
-objects replace the old ones. The timeline retains its configured capacity.
+objects replace the old ones. The active `session` is also unset. The timeline
+retains its configured capacity.
 Request serials remain monotonic, so delayed cleanup cannot reuse request IDs.
 Consumers must read the new `client.events` / `client.timeline` references after
 reconnection rather than retaining references from an old connection.
@@ -38,4 +40,30 @@ failed-handshake cleanup, stream-shutdown errors, and overlapping old close/new
 connect. The last race is exercised by gating the old stream's shutdown, opening
 a new connection, then releasing the old close and successfully pinging through
 the new reader. These checks do not constitute simulation resynchronization,
-same-room match restart or WAN/physical-controller acceptance.
+engine-driven match restart or WAN/physical-controller acceptance.
+
+## Session lifecycle (transport protocol 2)
+
+Once the host receives the started session identifier, it may explicitly return
+that session to the lobby with `request("lobby", session=session_id)`. The server
+requires the current host, a started/interrupted room and the matching session
+identifier. A delayed stop command for an earlier session cannot stop a new one.
+Returning clears readiness, frame counters and the relay budget; it preserves
+seats, reconnect credentials and disconnected-player leases. A new start requires
+the normal connected/ready/two-team barrier again and issues a fresh identifier.
+
+The client derives `session` from room snapshots, rather than assuming a control
+request's response means every peer has observed its broadcast. On a session
+change/end/disconnect it replaces its confirmed timeline and removes queued input
+events, preserving the event-queue object and noninput notices. It accepts input
+only for its current active session. Consumers must use the current timeline
+reference and session; an input already delivered to a consumer cannot be recalled
+by clearing a queue. Protocol-1 peers are rejected at hello because they do not
+provide these session-isolation semantics.
+
+Real-socket tests run two rounds in the same four-player room with different
+frame-zero values, reject both old stop commands and delayed old input relays,
+and accept fresh frame one afterward. The interruption case retains the missing
+player's lease and cannot start until that player reconnects and readies again.
+These checks verify the exercised room/input transitions; playable synchronized
+matches and engine recovery remain separate pending integration work.

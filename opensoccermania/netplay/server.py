@@ -208,6 +208,18 @@ class NetplayServer:
                 raise ValueError("team full")
             player.team, player.ready = team, False
             return {}, room
+        if op == "lobby":
+            if player.player != room.host:
+                raise ValueError("host required")
+            if room.state not in ("started", "interrupted"):
+                raise ValueError("match is not active")
+            if msg.get("session") != room.session:
+                raise ValueError("inactive session")
+            room.state, room.session = "lobby", ""
+            room.tokens, room.clock = 480.0, time.monotonic()
+            for member in room.players.values():
+                member.ready, member.last_frame = False, -1
+            return {}, room
         if op == "start":
             if player.player != room.host:
                 raise ValueError("host required")
