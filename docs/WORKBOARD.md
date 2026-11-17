@@ -5,6 +5,20 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.6. See
 
 ## Continuation verification, 2026-11-17
 
+- Stabilized reconnect acceptance without changing production lease behavior.
+  Sensitive tests replace only the server module's time reference; asyncio and
+  client timeouts retain real clocks. Successful authenticated reconnect survives
+  a real delay longer than the fixture lease while controlled server time stays
+  before expiry. Bounded waits observe disconnection and actual cleanup rather
+  than assuming fixed scheduling sleeps. A separate socket-level boundary case
+  accepts just before the deadline and rejects exactly at / after it; another
+  test keeps the real cleaner active and checks removal and host reassignment.
+  All seven network cases and 126 aggregate Python tests pass (one privilege
+  skip). An in-memory `<=` to `<` mutation fails specifically at the exact-deadline
+  assertion; no source mutation is retained. Independent review found no
+  actionable issues. Evidence: `pre6-build/lease-tests-python.log` and
+  `lease-boundary-mutation.log` under the private release-verification root.
+  CI `44167761093` also passes the preceding four-pad diagnostic commit.
 - Added explicit private diagnostic ownership for virtual-pad acquisition,
   reusing the PID-local keyboard packet. A stable enabled+diagnostic packet is
   required; missing, normal, disabled, invalid-magic or odd-sequence pages cannot

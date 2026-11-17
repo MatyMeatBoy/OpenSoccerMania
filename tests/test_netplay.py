@@ -1,6 +1,8 @@
 import asyncio
 import time
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 from opensoccermania.netplay import Compatibility, InputTimeline, NetplayClient, NetplayError, NetplayServer
 
 COMPAT = Compatibility("a" * 64)
@@ -14,6 +16,21 @@ class NetworkTests(unittest.IsolatedAsyncioTestCase):
         for client in self.clients:
             await client.close()
         await self.server.close()
+
+    def control_server_clock(self):
+        # Replace this module's time reference, never asyncio's monotonic clock.
+        clock = [time.monotonic()]
+        override = patch("opensoccermania.netplay.server.time",
+                         SimpleNamespace(monotonic=lambda: clock[0]))
+        override.start()
+        self.addCleanup(override.stop)
+        return clock
+
+    async def wait_until(self, predicate):
+        async def observed():
+            while not predicate():
+                await asyncio.sleep(0.005)
+        await asyncio.wait_for(observed(), 5)
 
     async def client(self):
         client = await NetplayClient().connect(port=self.server.port)
@@ -62,8 +79,13 @@ class NetworkTests(unittest.IsolatedAsyncioTestCase):
         identity = clients[1].identity.copy()
         room = self.server.rooms["test"]
         self.assertNotIn(identity["token"], str(self.server._snapshot(room)))
+        clock = self.control_server_clock()
+        player = room.players[identity["player"]]
         await clients[1].close()
-        await asyncio.sleep(0.03)
+        await self.wait_until(lambda: player.connection is None)
+        self.assertEqual(player.expires, clock[0] + self.server.lease_seconds)
+        # A wall-clock delay beyond the fixture lease must not change this case.
+        await asyncio.sleep(self.server.lease_seconds + 0.05)
         bad = dict(identity, token="wrong")
         with self.assertRaisesRegex(NetplayError, "credentials"):
             await fifth.resume(bad, COMPAT)
@@ -76,18 +98,49 @@ class NetworkTests(unittest.IsolatedAsyncioTestCase):
         for client in clients:
             await client.request("ready", ready=True)
         session = (await clients[0].request("start"))["session"]
+        clock = self.control_server_clock()
+        room = self.server.rooms["test"]
+        departed = room.players[clients[0].identity["player"]]
         await clients[0].close()
-        await asyncio.sleep(0.04)
-        self.assertEqual(self.server.rooms["test"].state, "interrupted")
+        await self.wait_until(lambda: departed.connection is None)
+        self.assertEqual(room.state, "interrupted")
         with self.assertRaisesRegex(NetplayError, "inactive"):
             await clients[1].request("input", session=session, frame=0, input={"x":0,"y":0,"buttons":0})
-        await asyncio.sleep(0.3)
-        self.assertNotEqual(self.server.rooms["test"].host, clients[0].identity["player"])
+        clock[0] = departed.expires
+        await self.wait_until(lambda: departed.player not in room.players)
+        self.assertNotEqual(room.host, departed.player)
         await self.server.close()
         # server.close is idempotent enough for fixture teardown; no old sessions survive restart.
-        await asyncio.sleep(0.01)
         with self.assertRaises((NetplayError, ConnectionError)):
             await clients[1].request("ping")
+
+    async def test_resume_lease_deadline_is_exclusive(self):
+        clients = await self.players()
+        replacement = await self.client()
+        clock = self.control_server_clock()
+        room = self.server.rooms["test"]
+        identity = clients[1].identity.copy()
+        player = room.players[identity["player"]]
+        # Isolate request-time expiry from periodic removal; the active-cleaner
+        # test separately checks removal and host reassignment.
+        self.server.cleaner.cancel()
+        await asyncio.gather(self.server.cleaner, return_exceptions=True)
+        await clients[1].close()
+        await self.wait_until(lambda: player.connection is None)
+        clock[0] = player.expires - 0.001
+        result = await replacement.resume(identity, COMPAT)
+        self.assertEqual(result["seat"], identity["seat"])
+        self.assertEqual(result["player"], identity["player"])
+        await replacement.close()
+        await self.wait_until(lambda: player.connection is None)
+        candidate = await self.client()
+        clock[0] = player.expires
+        with self.assertRaisesRegex(NetplayError, "seat unavailable"):
+            await candidate.resume(identity, COMPAT)
+        clock[0] += 1
+        with self.assertRaisesRegex(NetplayError, "seat unavailable"):
+            await candidate.resume(identity, COMPAT)
+        self.assertIs(room.players[player.player], player)
 
     async def test_protocol_bounds_and_room_capacity(self):
         import struct
