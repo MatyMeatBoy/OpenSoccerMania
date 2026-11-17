@@ -76,6 +76,8 @@ def main():
                 variants += [('--horizon',), ('--far-boundary',), ('--color-only',)]
             elif name == 'clear_rect':
                 variants += [('--original-aspect',)]
+            elif name == 'device_reset':
+                variants += [('--adaptive',)]
             elif name == 'save_metadata_runtime':
                 variants += [('--unsupported',), ('--trace',)]
             elif name == 'input_mailbox':

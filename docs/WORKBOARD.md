@@ -5,6 +5,17 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.5. See
 
 ## Continuation verification, 2026-11-17
 
+- Adaptive-reset correction: a new production-DLL variant first fits a 640x480
+  client into the physical 1920x1080 target, then repeats reset/recovery at the
+  same client size. Before the fix, logical drawing invades the left margin
+  (`gpu-46ekt26t`): `render_parameters` resets raster scales while the aspect
+  cache skips recalculation because its fitted rectangle is unchanged. The
+  raster mapping now invalidates that cache on creation/reset. All nineteen
+  integration cases pass with the rebuilt bridge (`gpu-vadh0ba0`), including
+  margin/content pixel checks across four logical resolutions. Python tests
+  pass 125 with one privilege skip; independent review found no actionable
+  introduced issues. First-frame behavior before Present and hardware loss
+  remain outside this regression's acceptance scope. This is unreleased.
 - Failed-reset/retry coverage now rejects null parameters and four invalid
   color-buffer resets, then recovers at 640x480, 1280x720, 1024x768 and 640x480.
   Each recovery checks logical target identity, viewport, actual physical-center

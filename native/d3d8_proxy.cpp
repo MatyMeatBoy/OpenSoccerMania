@@ -67,6 +67,7 @@ static float raster_x=1.0f,raster_y=1.0f;
 static float raster_offset_x=0,raster_offset_y=0;
 static unsigned logical_width=640,logical_height=480;
 static bool auto_window_aspect=true;
+static bool window_aspect_dirty=true;
 static RECT presentation_rect={0,0,1920,1080};
 static bool on_backbuffer(IDirect3DDevice8* device);
 using BackbufferFn=HRESULT (WINAPI *)(IDirect3DDevice8*,UINT,D3DBACKBUFFER_TYPE,IDirect3DSurface8**);
@@ -147,6 +148,9 @@ static void render_parameters(D3DPRESENT_PARAMETERS& physical,const D3DPRESENT_P
     const unsigned width=logical.BackBufferWidth?logical.BackBufferWidth:640;
     const unsigned height=logical.BackBufferHeight?logical.BackBufferHeight:480;
     logical_width=width;logical_height=height;
+    // Even an unchanged client rectangle needs new scales after reset or
+    // device creation replaces the logical-to-physical raster mapping.
+    window_aspect_dirty=true;
     physical.BackBufferWidth=requested_width;physical.BackBufferHeight=requested_height;
     raster_x=static_cast<float>(requested_width)/width;raster_y=static_cast<float>(requested_height)/height;
     if(!wide)raster_x=raster_y=std::min(raster_x,raster_y);
@@ -987,7 +991,8 @@ static void update_window_aspect(IDirect3DDevice8* device) {
     RECT client={};if(!GetClientRect(game_window,&client)||client.right<1||client.bottom<1)return;
     const auto fit=osm::fit_rect(requested_width,requested_height,static_cast<double>(client.right)/client.bottom);
     RECT output={fit.x,fit.y,fit.x+fit.width,fit.y+fit.height};
-    if(std::memcmp(&output,&presentation_rect,sizeof(output))==0)return;
+    if(!window_aspect_dirty&&std::memcmp(&output,&presentation_rect,sizeof(output))==0)return;
+    window_aspect_dirty=false;
     presentation_rect=output;
     const auto content=osm::content_rect(fit,logical_width,logical_height,wide);
     raster_x=static_cast<float>(content.width)/logical_width;raster_y=static_cast<float>(content.height)/logical_height;
