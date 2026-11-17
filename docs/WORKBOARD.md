@@ -46,6 +46,12 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.5. See
   `save-repeat-1/` through `save-repeat-4/` in the same private evidence root.
   These successful repeats do not reproduce or close the intermittent failure.
   Post-release commit `1086340` also passes public CI run `44140253665`.
+- A 600-second isolated Story probe restores the saved team, enters City Park,
+  observes an opponent goal and a visible return to kickoff, then closes cleanly
+  with unchanged saves. Evidence: `story-mission-reload/summary.json`, especially
+  captures 5, 34 and 35. It does not finish a winning mission or verify saved
+  progression; the earlier intermittent black transition remains open across
+  other replay/camera paths. No test game process remains after the probe.
 - Preview alignment is now verified for the observed animated model path. The
   model renderer and its clear operation have separate, signature-checked caller
   scopes; the preceding UI flush is not marked as model geometry. Local preview
