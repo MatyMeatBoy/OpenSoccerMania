@@ -13,7 +13,9 @@ static ULONGLONG last_simulation_tick=0;
 static unsigned long long camera_calls=0,camera_position_changes=0;
 static float camera_vertical_min=100,camera_vertical_max=0;
 static void* last_camera_source=nullptr;
+static bool pause_state_verified=false;
 static bool engine_gameplay() {
+    if(pause_state_verified&&(*reinterpret_cast<const unsigned*>(0x689644)||*reinterpret_cast<const unsigned*>(0x689648)))return false;
     return timing_hooks_active&&last_simulation_tick&&GetTickCount64()-last_simulation_tick<300&&
         *reinterpret_cast<const unsigned*>(0x5b75cc)>0;
 }
@@ -40,7 +42,7 @@ static void __cdecl save_snapshots() {
         FILE* file=std::fopen(engine_log,"a");if(file){std::fprintf(file,"INTERPOLATION_HISTORY seeded_bytes=%u\n",bytes);std::fclose(file);}
     }
 }
-static bool smooth_interpolation=true,interpolation_hook_active=false;
+static bool smooth_interpolation=false,interpolation_hook_active=false;
 static char engine_config[MAX_PATH];
 static bool isolated_camera_probe=false;
 static float probe_camera_pitch=999.f;
@@ -52,7 +54,7 @@ static void record_interpolation(float effective_alpha) {
     if(tick==previous_interpolation_tick&&effective_alpha+.00001f<previous_interpolation_alpha)++interpolation_rewinds;
     previous_interpolation_tick=tick;previous_interpolation_alpha=effective_alpha;
 }
-static void __cdecl interpolate_frame() {
+[[maybe_unused]] static void __cdecl interpolate_frame() {
     ++interpolation_frames;
     const float alpha=*reinterpret_cast<const float*>(0x5e8218);
     if(timing_hooks_active&&smooth_interpolation&&alpha<=.05f&&valid_interpolation_fraction(alpha)) {
@@ -159,7 +161,7 @@ static void engine_report() {
     if(interpolation_hook_active) {
         file=std::fopen(engine_log,"a");if(file){std::fprintf(file,"INTERPOLATION smooth=%d frames=%llu corrected_boundary_frames=%llu within_tick_rewinds=%llu\n",smooth_interpolation,interpolation_frames,interpolation_boundary_frames,interpolation_rewinds);std::fclose(file);}
         interpolation_frames=interpolation_boundary_frames=interpolation_rewinds=0;
-        smooth_interpolation=GetPrivateProfileIntA("Graphics","SmoothInterpolation",1,engine_config)!=0;
+        smooth_interpolation=false;
     }
     if(isolated_camera_probe) {
         char pitch[32];GetPrivateProfileStringA("Diagnostics","ProbeCameraPitch","999",pitch,sizeof(pitch),engine_config);
@@ -182,6 +184,14 @@ static void start_engine_hooks(const char* directory,const char* config) {
     if(camera_zoom_index<0||camera_zoom_index>2)camera_zoom_index=0;
     if(!GetPrivateProfileIntA("Graphics","VerifiedExecutable",0,config))return;
     auto* base=reinterpret_cast<unsigned char*>(GetModuleHandleA(nullptr));
+    const unsigned char pause_open[]={0xc7,0x05,0x48,0x96,0x68,0x00,0x01,0x00,0x00,0x00};
+    const unsigned char pause_ready[]={0xc7,0x05,0x44,0x96,0x68,0x00,0x01,0x00,0x00,0x00};
+    const unsigned char pause_close[]={0xc7,0x05,0x44,0x96,0x68,0x00,0x00,0x00,0x00,0x00};
+    const unsigned char pause_closed[]={0xc7,0x05,0x48,0x96,0x68,0x00,0x00,0x00,0x00,0x00};
+    pause_state_verified=std::memcmp(base+0x12f976,pause_open,sizeof(pause_open))==0&&
+        std::memcmp(base+0x12f997,pause_ready,sizeof(pause_ready))==0&&
+        std::memcmp(base+0x12fa0d,pause_close,sizeof(pause_close))==0&&
+        std::memcmp(base+0x12fa45,pause_closed,sizeof(pause_closed))==0;
     const unsigned char advance_signature[]={0x56,0x8b,0x74,0x24,0x08,0x8d,0x46,0x18};
     const unsigned char pose_signature[]={0x81,0xec,0x24,0x01,0x00,0x00,0x53,0x55,0x56};
     if(GetPrivateProfileIntA("Diagnostics","TraceAnimation",0,config)&&
@@ -206,8 +216,7 @@ static void start_engine_hooks(const char* directory,const char* config) {
         if(!snapshot_history_hooks_active){if(a==MH_OK)MH_RemoveHook(base+0x1f7c0);if(b==MH_OK)MH_RemoveHook(base+0x1fca0);}
     }
     if(std::memcmp(base+0x1fcd0,interpolation_signature,sizeof(interpolation_signature))==0) {
-        smooth_interpolation=GetPrivateProfileIntA("Graphics","SmoothInterpolation",1,config)!=0;
-        interpolation_hook_active=MH_CreateHook(base+0x1fcd0,reinterpret_cast<void*>(interpolate_frame),reinterpret_cast<void**>(&original_interpolation))==MH_OK;
+        smooth_interpolation=false; // Retired: preserve the original interpolation path.
     }
     camera_horplus_enabled=GetPrivateProfileIntA("Graphics","ExperimentalHorPlus",0,config)!=0;
     // Install independently of Hor+ so live zoom works in original-framing/4:3 modes.

@@ -78,6 +78,8 @@ class VideoTests(unittest.TestCase):
 
     def test_safe_default_is_windowed(self):
         self.assertEqual(VideoSettings().window_mode,'Windowed')
+        self.assertTrue(VideoSettings().horplus)
+        self.assertFalse(VideoSettings(smooth_interpolation=True).smooth_interpolation)
         with self.assertRaises(ValueError):VideoSettings(display_mode='invalid')
 
     def test_adaptive_aspect_does_not_constrain_window_shape(self):
@@ -89,13 +91,13 @@ class VideoTests(unittest.TestCase):
 
     def test_real_wrapper_version_preamble(self):
         text='; Wrapper version\nVersion = 0x279\n\n[General]\nScalingMode=stretched_4_3\n'
-        result=configure_wrapper(text,VideoSettings())
+        result=configure_wrapper(text,VideoSettings(horplus=False))
         self.assertTrue(result.startswith('; Wrapper version\nVersion = 0x279'))
         self.assertIn('stretched_ar',result)
 
     def test_profiles_preserve_aspect_and_unknown_options(self):
         old = '[General]\nScalingMode = stretched_4_3\nFoo = keep\n[DirectX]\nResolution = h:1920, v:1440, refrate:59\n[Glide]\nResolution = h:1920, v:1440, refrate:59\n'
-        new = configure_wrapper(old, VideoSettings(3840, 2160, 240))
+        new = configure_wrapper(old, VideoSettings(3840, 2160, 240,horplus=False))
         self.assertIn('stretched_ar', new)
         self.assertIn('Foo = keep', new)
         self.assertIn('h:3840, v:2160, refrate:240', new)

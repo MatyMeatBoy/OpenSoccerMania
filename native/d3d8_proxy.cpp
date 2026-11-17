@@ -12,6 +12,7 @@
 #include "buffer_mirror.h"
 #include "hook_chain.h"
 #include "input_page.h"
+#include "cursor_mode.h"
 #include "aspect.h"
 #include "layout.h"
 #include "screen_vertices.h"
@@ -22,6 +23,7 @@
 #include "portable.h"
 #include "engine_hooks.h"
 #include "title_background.h"
+#include "menu_background.h"
 namespace osm {void start_backend_probe(const char* directory);}
 static osm::PerformanceHud performance_hud;
 static osm::SettingsMenu settings_menu;
@@ -130,12 +132,15 @@ static void render_parameters(D3DPRESENT_PARAMETERS& physical,const D3DPRESENT_P
 using ReleaseDeviceFn=ULONG (WINAPI *)(IDirect3DDevice8*);
 static ReleaseDeviceFn original_release_device;
 static ULONG WINAPI release_device(IDirect3DDevice8* device) {
+    const bool menu_device=osm::menu_background.owns_device(device);
+    if(menu_device)osm::menu_background.release();
     const bool title_device=osm::title_background.owns_device(device);
     if(title_device)osm::title_background.release();
     performance_hud.release(device);
     settings_menu.release(device);
     const ULONG references=original_release_device(device);
     if(title_device&&references)osm::title_background.set_device(device);
+    if(menu_device&&references)osm::menu_background.set_device(device);
     return references;
 }
 static BOOL (WINAPI *original_clip)(const RECT*)=nullptr;
@@ -181,6 +186,20 @@ static WNDPROC original_legacy_proc=nullptr;
 static WINDOWPLACEMENT saved_window_placement={};
 static bool have_window_placement=false;
 static bool window_toggle_down=false;
+static osm::InputCursorMode cursor_mode;
+static HCURSOR last_game_cursor=nullptr;
+static HCURSOR (WINAPI *original_set_cursor)(HCURSOR)=nullptr;
+static bool cursor_inside_game() {
+    if(!game_window||GetForegroundWindow()!=game_window)return false;
+    POINT point={};if(!GetCursorPos(&point))return false;
+    const HWND under=WindowFromPoint(point);if(under!=game_window&&GetAncestor(under,GA_ROOT)!=game_window)return false;
+    if(!ScreenToClient(game_window,&point))return false;
+    RECT client={};return GetClientRect(game_window,&client)&&PtInRect(&client,point);
+}
+static HCURSOR WINAPI controller_cursor(HCURSOR cursor) {
+    if(cursor)last_game_cursor=cursor;
+    return original_set_cursor(cursor_mode.hidden()&&cursor_inside_game()?nullptr:cursor);
+}
 static void toggle_borderless(HWND window);
 static LRESULT CALLBACK legacy_proc(HWND window,UINT message,WPARAM wparam,LPARAM lparam) {
     // The backend owns the physical window. Keep the game's 640x480 coordinate model stable.
@@ -189,6 +208,9 @@ static LRESULT CALLBACK legacy_proc(HWND window,UINT message,WPARAM wparam,LPARA
     return CallWindowProcA(original_legacy_proc,window,message,wparam,lparam);
 }
 static LRESULT CALLBACK game_proc(HWND window,UINT message,WPARAM wparam,LPARAM lparam) {
+    if(message==WM_MOUSEMOVE){cursor_mode.mouse_moved(static_cast<short>(LOWORD(lparam)),static_cast<short>(HIWORD(lparam)));if(!cursor_mode.hidden()&&original_set_cursor&&cursor_inside_game())original_set_cursor(last_game_cursor?last_game_cursor:LoadCursorA(nullptr,IDC_ARROW));}
+    if(message==WM_SETCURSOR&&LOWORD(lparam)==HTCLIENT&&cursor_mode.hidden()&&cursor_inside_game()){if(original_set_cursor)original_set_cursor(nullptr);return TRUE;}
+    if(message==WM_KILLFOCUS||(message==WM_ACTIVATEAPP&&!wparam))cursor_mode.release();
     if(message==WM_KILLFOCUS||(message==WM_ACTIVATEAPP&&!wparam))settings_menu.close_panel();
     if(settings_menu.is_open()&&((message>=WM_KEYFIRST&&message<=WM_KEYLAST)||(message>=WM_MOUSEFIRST&&message<=WM_MOUSELAST)))return 0;
     if((message==WM_KEYUP&&wparam==VK_F11)||(message==WM_SYSKEYUP&&wparam==VK_RETURN)) {
@@ -229,14 +251,14 @@ static osm::PrivateKeyboard private_keyboard;
 static SHORT WINAPI async_key(int key) {
     if(settings_menu.is_open())return 0;
     const bool focused=game_window&&GetForegroundWindow()==game_window;
-    const SHORT injected=private_keyboard.state(key,focused);
+    const SHORT injected=private_keyboard.state(key,focused,osm::movie_files.load()!=0);
     if(injected)return injected;
     if(game_window && !focused)return 0;
     return original_async_key(key);
 }
 static SHORT settings_key(int key) {
     const bool focused=game_window&&GetForegroundWindow()==game_window;
-    const SHORT injected=private_keyboard.state(key,focused);
+    const SHORT injected=private_keyboard.state(key,focused,osm::movie_files.load()!=0);
     return injected?injected:focused&&original_async_key?original_async_key(key):0;
 }
 static int (WINAPI *original_message_box)(HWND,LPCSTR,LPCSTR,UINT)=nullptr;
@@ -446,6 +468,7 @@ static void toggle_borderless(HWND window) {
 }
 
 static HRESULT WINAPI reset(IDirect3DDevice8* device,D3DPRESENT_PARAMETERS* params) {
+    osm::menu_background.release();
     osm::title_background.release();osm::reset_title_frame();
     invalidate_state_cache();
     performance_hud.release(device);
@@ -456,20 +479,21 @@ static HRESULT WINAPI reset(IDirect3DDevice8* device,D3DPRESENT_PARAMETERS* para
     D3DPRESENT_PARAMETERS physical=*params;window_parameters(&physical);render_parameters(physical,*params);
     const HRESULT result=real_reset(device,&physical);
     FILE* file=std::fopen(log_path,"a");if(file){std::fprintf(file,"RESET result=0x%lx size=%ux%u windowed=%d\n",static_cast<unsigned long>(result),physical.BackBufferWidth,physical.BackBufferHeight,physical.Windowed);std::fclose(file);}
-    if(SUCCEEDED(result)){osm::title_background.set_device(device);window_appearance(params->hDeviceWindow);}
+    if(SUCCEEDED(result)){osm::menu_background.set_device(device);osm::title_background.set_device(device);window_appearance(params->hDeviceWindow);}
     return result;
 }
 static unsigned constant_calls=0;
 static bool integer_movies=true;
 static D3DVIEWPORT8 last_movie_viewport={};
 struct DrawAdjustment {
+    osm::MenuPromptTextureSwap prompt_texture;
     IDirect3DDevice8* device;
     bool constants_changed=false,viewport_changed=false;
     float constants[4]={};D3DVIEWPORT8 viewport={};
     DWORD multisample=0,stage_values[4]={};bool multisample_changed=false,stage_changed[4]={};
     DWORD fog=0;bool fog_changed=false;
     const D3DTEXTURESTAGESTATETYPE stage_types[4]={D3DTSS_ADDRESSU,D3DTSS_ADDRESSV,D3DTSS_MINFILTER,D3DTSS_MAGFILTER};
-    explicit DrawAdjustment(IDirect3DDevice8* value,bool flat_screen=false,bool background_layer=false):device(value) {
+    explicit DrawAdjustment(IDirect3DDevice8* value,bool flat_screen=false,bool background_layer=false):prompt_texture(value),device(value) {
         if(!wide&&!osm::movie_files.load()&&!sprite_fix_mode&&!background_layer)return;
         if(!on_backbuffer(device))return;
         if(background_layer&&SUCCEEDED(IDirect3DDevice8_GetRenderState(device,D3DRS_FOGENABLE,&fog))&&fog)
@@ -893,18 +917,19 @@ static HRESULT WINAPI draw_indexed(IDirect3DDevice8* device,D3DPRIMITIVETYPE typ
 }
 
 static void update_window_aspect(IDirect3DDevice8* device) {
-    if(!wide||!auto_window_aspect||display_mode==2)return;
+    if((wide&&!auto_window_aspect)||display_mode==2)return;
     RECT client={};if(!GetClientRect(game_window,&client)||client.right<1||client.bottom<1)return;
     const auto fit=osm::fit_rect(requested_width,requested_height,static_cast<double>(client.right)/client.bottom);
     RECT output={fit.x,fit.y,fit.x+fit.width,fit.y+fit.height};
     if(std::memcmp(&output,&presentation_rect,sizeof(output))==0)return;
     presentation_rect=output;
-    raster_x=static_cast<float>(fit.width)/logical_width;raster_y=static_cast<float>(fit.height)/logical_height;
-    raster_offset_x=static_cast<float>(fit.x);raster_offset_y=static_cast<float>(fit.y);
+    const auto content=osm::content_rect(fit,logical_width,logical_height,wide);
+    raster_x=static_cast<float>(content.width)/logical_width;raster_y=static_cast<float>(content.height)/logical_height;
+    raster_offset_x=static_cast<float>(content.x);raster_offset_y=static_cast<float>(content.y);
     const float aspect=static_cast<float>(fit.width)/fit.height;
-    scale=std::min(1.f,(4.f/3.f)/aspect);vertical_scale=std::min(1.f,aspect/(4.f/3.f));
+    scale=wide?std::min(1.f,(4.f/3.f)/aspect):1.f;vertical_scale=wide?std::min(1.f,aspect/(4.f/3.f)):1.f;
     osm::engine_aspect=aspect;
-    D3DVIEWPORT8 viewport={static_cast<DWORD>(fit.x),static_cast<DWORD>(fit.y),static_cast<DWORD>(fit.width),static_cast<DWORD>(fit.height),0,1};
+    D3DVIEWPORT8 viewport={static_cast<DWORD>(content.x),static_cast<DWORD>(content.y),static_cast<DWORD>(content.width),static_cast<DWORD>(content.height),0,1};
     original_set_viewport(device,&viewport);
     FILE* file=std::fopen(log_path,"a");if(file){std::fprintf(file,"WINDOW_ASPECT client=%ldx%ld roi=%dx%d+%d+%d correction=%.5f,%.5f\n",client.right,client.bottom,fit.width,fit.height,fit.x,fit.y,scale,vertical_scale);std::fclose(file);}
 }
@@ -912,13 +937,16 @@ static void update_window_aspect(IDirect3DDevice8* device) {
 static HRESULT WINAPI present(IDirect3DDevice8* device,const RECT* source,const RECT* dest,HWND window,const RGNDATA* dirty) {
     osm::reset_title_frame();
     settings_key(VK_F1); // Also opens a late private test/controller page.
+    bool controller_active=false;const DWORD activity=private_keyboard.controller_activity(controller_active);
+    cursor_mode.update(activity,controller_active,game_window&&GetForegroundWindow()==game_window,cursor_inside_game());
+    if(cursor_mode.hidden()&&original_set_cursor&&cursor_inside_game())original_set_cursor(nullptr);
     settings_menu.set_controller(private_keyboard.controller_present());
-    settings_menu.update(settings_key,(game_window&&GetForegroundWindow()==game_window)||private_keyboard.background_test_enabled(),osm::engine_gameplay());
+    osm::menu_background.set_controller(private_keyboard.controller_present());
+    settings_menu.update(settings_key,(game_window&&GetForegroundWindow()==game_window)||private_keyboard.background_test_enabled(),osm::engine_gameplay(),osm::movie_files.load()!=0);
     if(settings_menu.consume_changed()) {
         performance_hud.set_enabled(settings_menu.hud_enabled());
         overlay_user_scale=settings_menu.hud_scale()/100.f;
         osm::camera_zoom_index=settings_menu.zoom_index();
-        osm::smooth_interpolation=settings_menu.smooth_enabled();
     }
     if(display_mode!=2) {
         const bool focused=game_window&&GetForegroundWindow()==game_window;
@@ -971,7 +999,11 @@ static HRESULT WINAPI present(IDirect3DDevice8* device,const RECT* source,const 
         shader_queries=shader_hits=constant_queries=constant_hits=screen_locks=0;screen_lock_ticks=0;profile_frames=0;
     }
     LARGE_INTEGER start,end,frequency;QueryPerformanceFrequency(&frequency);QueryPerformanceCounter(&start);
-    const RECT* output=wide&&auto_window_aspect&&display_mode!=2&&!source?&presentation_rect:source;
+    RECT mapped_source={};const RECT* output=source;
+    if(source) {
+        const auto mapped=osm::present_rect({static_cast<int>(source->left),static_cast<int>(source->top),static_cast<int>(source->right-source->left),static_cast<int>(source->bottom-source->top)},raster_x,raster_y,raster_offset_x,raster_offset_y);
+        mapped_source={mapped.x,mapped.y,mapped.x+mapped.width,mapped.y+mapped.height};output=&mapped_source;
+    } else if((!wide||auto_window_aspect)&&display_mode!=2)output=&presentation_rect;
     const HRESULT status=real_present(device,output,dest,window,dirty);
     QueryPerformanceCounter(&end);performance_hud.last_present=1000.0*(end.QuadPart-start.QuadPart)/frequency.QuadPart;
     if(display_mode!=2)ClipCursor(nullptr);
@@ -1018,6 +1050,7 @@ static HRESULT WINAPI create_device(IDirect3D8* api,UINT adapter,D3DDEVTYPE type
         hook(&table->ApplyStateBlock,apply_state,original_apply_state);
         target_is_backbuffer=true;
         osm::title_background.set_device(*result);
+        osm::menu_background.set_device(*result);
         IDirect3DSurface8* back=nullptr;if(SUCCEEDED(backbuffer(*result,0,D3DBACKBUFFER_TYPE_MONO,&back))&&back)IDirect3DSurface8_Release(back);
         D3DVIEWPORT8 viewport={0,0,logical_width,logical_height,0,1};set_viewport(*result,&viewport);
         FILE* file=std::fopen(log_path,"a");
@@ -1051,6 +1084,7 @@ extern "C" IDirect3D8* WINAPI Direct3DCreate8(UINT sdk_version) {
             AddVectoredExceptionHandler(0,exception_log);
             MH_CreateHook(reinterpret_cast<void*>(ClipCursor),reinterpret_cast<void*>(clip_cursor),reinterpret_cast<void**>(&original_clip));
             MH_CreateHook(reinterpret_cast<void*>(SetCursorPos),reinterpret_cast<void*>(warp_cursor),reinterpret_cast<void**>(&original_warp));
+            MH_CreateHook(reinterpret_cast<void*>(SetCursor),reinterpret_cast<void*>(controller_cursor),reinterpret_cast<void**>(&original_set_cursor));
             MH_CreateHook(reinterpret_cast<void*>(MessageBoxA),reinterpret_cast<void*>(message_box),reinterpret_cast<void**>(&original_message_box));
             MH_CreateHook(reinterpret_cast<void*>(GetAsyncKeyState),reinterpret_cast<void*>(async_key),reinterpret_cast<void**>(&original_async_key));
             osm::start_backend_probe(directory);
@@ -1059,6 +1093,7 @@ extern "C" IDirect3D8* WINAPI Direct3DCreate8(UINT sdk_version) {
             osm::start_engine_hooks(directory,config_path);
             osm::start_edition_hooks(config_path,log_path);
             osm::start_title_hooks(config_path,log_path);
+            osm::menu_background.start(config_path,log_path,{[](){return target_is_backbuffer;},[](){return wide?scale:1.f;},draw_up});
             MH_EnableHook(MH_ALL_HOOKS);
         }
         global_hooks_ready=true;

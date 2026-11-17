@@ -15,6 +15,10 @@ int main() {
         words[1]=3;assert(keyboard.state(VK_SPACE,true)==0); // Reject a writer in progress.
         words[1]=4;words[2]=3;assert((keyboard.state(VK_SPACE,false)&0x8000)!=0); // Explicit private test mode.
         words[2]=0;assert(keyboard.state(VK_SPACE,true)==0);
+        data[16+MapVirtualKeyW(VK_ESCAPE,0)]=0x80;words[2]=17;
+        assert(keyboard.state(VK_ESCAPE,true,false)==0); // A stale skip cannot back out of the next menu.
+        assert((keyboard.state(VK_ESCAPE,true,true)&0x8000)!=0);
+        assert(keyboard.state(VK_ESCAPE,false,true)==0); // Movie skip still respects foreground ownership.
     }
     UnmapViewOfFile(data);CloseHandle(map);
 }

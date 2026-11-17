@@ -183,7 +183,7 @@ class Launcher:
         self.filter=tk.StringVar(value=saved.get('filtering','16× anisotropic'))
         self.vsync=tk.BooleanVar(value=saved.get('vsync',True))
         self.display_mode=tk.StringVar(value=saved.get('display_mode') or ('Fullscreen' if saved.get('fullscreen',False) else 'Windowed'))
-        self.horplus=tk.BooleanVar(value=saved.get('horplus',False))
+        self.horplus=tk.BooleanVar(value=saved.get('horplus',True))
         self.performance_hud=tk.BooleanVar(value=saved.get('performance_hud',True))
         self.overlay_scale=tk.StringVar(value=f"{saved.get('overlay_scale',125)}%")
         self.run_background=tk.BooleanVar(value=saved.get('run_background',True))
@@ -192,7 +192,6 @@ class Launcher:
         self.auto_aspect=tk.BooleanVar(value=saved.get('auto_aspect',True))
         self.sprite_seam_fix=tk.BooleanVar(value=saved.get('sprite_seam_fix',True))
         self.modern_presentation=tk.BooleanVar(value=saved.get('modern_presentation',True))
-        self.smooth_interpolation=tk.BooleanVar(value=saved.get('smooth_interpolation',True))
         self.camera_zoom=tk.StringVar(value=saved.get('camera_zoom','Original zoom'))
         self.xbox_prompts=tk.BooleanVar(value=saved.get('xbox_prompts',True))
         self.title_extension=tk.BooleanVar(value=saved.get('title_extension',True))
@@ -216,7 +215,6 @@ class Launcher:
         ttk.Checkbutton(card,text='Adapt Hor+ camera to the window shape',variable=self.auto_aspect).grid(row=13,columnspan=2,sticky='w',pady=6)
         ttk.Checkbutton(card,text='Fix seams in menus and tiled images',variable=self.sprite_seam_fix).grid(row=15,columnspan=2,sticky='w',pady=6)
         ttk.Checkbutton(card,text='Low-latency presentation',variable=self.modern_presentation).grid(row=16,columnspan=2,sticky='w',pady=6)
-        ttk.Checkbutton(card,text='Smooth animation interpolation at high FPS',variable=self.smooth_interpolation).grid(row=17,columnspan=2,sticky='w',pady=6)
         ttk.Label(card,text='Camera framing').grid(row=18,column=0,sticky='w',pady=8)
         ttk.Combobox(card,textvariable=self.camera_zoom,values=CAMERA_ZOOMS,state='readonly').grid(row=18,column=1,sticky='ew')
         ttk.Checkbutton(card,text='Xbox button hints for connected controllers',variable=self.xbox_prompts).grid(row=19,columnspan=2,sticky='w',pady=6)
@@ -255,10 +253,10 @@ class Launcher:
         self.controller_auto=tk.BooleanVar(value=settings.get('automatic_mode',True))
         self.controller_mode=tk.StringVar(value='Menu')
         self.controller_deadzone=tk.StringVar(value=f"{round(settings.get('deadzone',.2)*100)}%")
-        ttk.Checkbutton(frame,text='Enable SDL controller bridge (select Keyboard in the game)',variable=self.controller_enabled).pack(anchor='w',pady=8)
+        ttk.Checkbutton(frame,text='Enable SDL controllers (up to four separate gamepads)',variable=self.controller_enabled).pack(anchor='w',pady=8)
         ttk.Checkbutton(frame,text='Automatically switch between game and menu controls',variable=self.controller_auto).pack(anchor='w',pady=4)
         self.device_choice=tk.StringVar(value='Automatic');self.device_options={'Automatic':None};self.device_signature=None
-        ttk.Label(frame,text='Active controller').pack(anchor='w',pady=(8,4))
+        ttk.Label(frame,text='Controller for internal settings navigation').pack(anchor='w',pady=(8,4))
         self.device_selector=ttk.Combobox(frame,textvariable=self.device_choice,values=['Automatic'],state='readonly');self.device_selector.pack(fill='x')
         self.device_selector.bind('<<ComboboxSelected>>',lambda event:setattr(self.controller,'selected_id',self.device_options.get(self.device_choice.get())))
         row=ttk.Frame(frame);row.pack(fill='x',pady=8)
@@ -267,14 +265,12 @@ class Launcher:
         mode.bind('<<ComboboxSelected>>',lambda event:setattr(self.controller,'mode',self.controller_mode.get()))
         ttk.Label(row,text='Stick deadzone').pack(side='left',padx=(24,12))
         ttk.Combobox(row,textvariable=self.controller_deadzone,values=['10%','15%','20%','25%','30%'],state='readonly',width=9).pack(side='left')
-        ttk.Label(frame,text='View / Select + Start opens in-game settings. Menu: A confirms, B goes back. Match: A passes, B shoots, X plays a long ball, Y activates power-ups. Start pauses when released; the settings chord never also pauses the game.',style='Muted.TLabel',wraplength=760).pack(anchor='w',pady=(8,15))
+        ttk.Label(frame,text='View / Select + Start opens in-game settings. Menu: A confirms, B goes back. Match: A passes, B shoots, X plays a long ball, Y activates power-ups. LB sprints and RB switches players. Select / View skips videos when released. Start pauses; Start + Select opens settings without also pausing or skipping.',style='Muted.TLabel',wraplength=760).pack(anchor='w',pady=(8,15))
         card=ttk.LabelFrame(frame,text=' XBOX-STYLE MATCH LAYOUT ',padding=15);card.pack(fill='x')
         self.controller_keys={}
-        mapping={int(k):v for k,v in settings.get('mapping',MATCH).items()}
-        for row,(button,label,key) in enumerate([(0,'A · Pass / slide tackle','S'),(1,'B · Shoot','D'),(2,'X · Long ball / foot-in tackle','A'),(3,'Y · Power-up','W'),(9,'LB · Switch player / skill move','Q'),(10,'RB · Sprint','Shift'),(6,'Menu · Pause','Space')]):
-            variable=tk.StringVar(value=mapping.get(button,key));self.controller_keys[button]=variable
-            ttk.Label(card,text=label).grid(row=row,column=0,sticky='w',padx=(0,30),pady=4)
-            ttk.Combobox(card,textvariable=variable,values=list(KEYS),state='readonly',width=14).grid(row=row,column=1,sticky='ew',pady=4)
+        for row,(button,action) in enumerate([('A','Pass / slide tackle'),('B','Shoot'),('X','Long ball / foot-in tackle'),('Y','Power-up'),('LB','Sprint'),('RB','Switch player / skill move'),('Start / Menu','Pause'),('Select / View','Skip video')]):
+            ttk.Label(card,text=button).grid(row=row,column=0,sticky='w',padx=(0,30),pady=4)
+            ttk.Label(card,text=action).grid(row=row,column=1,sticky='w',pady=4)
         card.columnconfigure(1,weight=1)
         raw=ttk.LabelFrame(frame,text=' UNMAPPED DEVICE BUTTONS ',padding=15);raw.pack(fill='x',pady=(18,0))
         ttk.Label(raw,text='Only used for raw joysticks without an SDL gamepad mapping. Button numbers start at zero.',style='Muted.TLabel',wraplength=700).grid(row=0,columnspan=2,sticky='w',pady=(0,8))
@@ -285,7 +281,7 @@ class Launcher:
             ttk.Combobox(raw,textvariable=variable,values=['-1',*map(str,range(32))],state='readonly',width=14).grid(row=row,column=1,sticky='ew',pady=3)
         raw.columnconfigure(1,weight=1)
         ttk.Button(frame,text='Save controller profile',style='Accent.TButton',command=self.save_controls).pack(anchor='w',pady=15)
-        ttk.Label(frame,text='Left stick / D-pad: movement. SDL handles mapped XInput, DirectInput and HID devices. Raw devices can use the button profile above. This bridge drives one keyboard player; native multiplayer remains separate. Physical devices still need acceptance testing.',style='Muted.TLabel',wraplength=760).pack(anchor='w')
+        ttk.Label(frame,text='Left stick / D-pad: movement. SDL handles mapped XInput, DirectInput and HID devices. Raw devices can use the button profile above. Each connected pad has a separate native controller slot; the keyboard remains independent. Choose each player in the game. Physical four-controller play still needs acceptance testing.',style='Muted.TLabel',wraplength=760).pack(anchor='w')
 
     def save_controls(self):
         raw={}
@@ -342,7 +338,7 @@ class Launcher:
             settings=read_live_settings(self.entry,VideoSettings(**self.prefs.get('video',{})))
             self.prefs['video']=asdict(settings);self.persist()
             self.camera_zoom.set(settings.camera_zoom);self.performance_hud.set(settings.performance_hud)
-            self.overlay_scale.set(f'{settings.overlay_scale}%');self.smooth_interpolation.set(settings.smooth_interpolation);self.xbox_prompts.set(settings.xbox_prompts)
+            self.overlay_scale.set(f'{settings.overlay_scale}%');self.xbox_prompts.set(settings.xbox_prompts)
             self.render_fps.set(next(label for label,value in RENDER_LIMITS.items() if value==settings.render_fps))
         except (OSError,ValueError,TypeError) as error:self.log.warning('Could not synchronize in-game preferences: %s',error)
 
@@ -433,7 +429,7 @@ class Launcher:
             settings.auto_aspect=self.auto_aspect.get()
             settings.sprite_seam_fix=self.sprite_seam_fix.get()
             settings.modern_presentation=self.modern_presentation.get()
-            settings.smooth_interpolation=self.smooth_interpolation.get()
+            settings.smooth_interpolation=False
             settings.camera_zoom=self.camera_zoom.get();settings.xbox_prompts=self.xbox_prompts.get()
             settings.edition=self.edition.get();settings.language=self.language.get();settings.title_extension=self.title_extension.get()
             settings.__post_init__()

@@ -18,7 +18,7 @@ The corrected boundary path uses the actual fraction, including zero. Outside th
 
 ## Controls and verification
 
-The launcher exposes **Smooth animation interpolation at high FPS**. `Graphics.SmoothInterpolation` defaults to 1 in the native configuration and can be disabled for comparison. Installation requires the existing executable identity gate and a matching dispatcher signature. Diagnostic traces report corrected boundary frames and within-tick coefficient rewinds. `Diagnostics.TraceAnimation=1` enables bounded animation-state counters; normal configurations do not install those diagnostic animation hooks.
+The experimental Smooth Mode was removed for pre.4 after the reporter observed worse behavior. Old saved preferences are forced off, and the custom boundary dispatcher is no longer installed. The original interpolation path remains active. The first-snapshot history initialization described below stays enabled independently because it fixes uninitialized camera state.
 
 The native regression reproduces the legacy endpoint rewind, checks monotonic progress through zero and the 0.05 boundary, crosses a tick boundary, exercises differently sized snapshot records and verifies that endpoint buffers remain unchanged. Live A/B results are recorded in the work board after validation.
 

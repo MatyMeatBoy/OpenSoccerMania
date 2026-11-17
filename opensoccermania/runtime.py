@@ -56,7 +56,7 @@ def configure_bridge(entry,settings):
     config['Graphics']['AutoWindowAspect']=str(int(getattr(settings,'auto_aspect',True)))
     config['Graphics']['SpriteSeamFix']='7' if settings.sprite_seam_fix else '0'
     config['Graphics']['VSync']=str(int(settings.vsync))
-    config['Graphics']['SmoothInterpolation']=str(int(settings.smooth_interpolation))
+    config['Graphics']['SmoothInterpolation']='0'
     config['Graphics']['CameraZoom']=str(CAMERA_ZOOMS.index(settings.camera_zoom))
     config['Graphics']['XboxPrompts']=str(int(settings.xbox_prompts))
     config['Graphics']['TitleExtension']=str(int(settings.title_extension))
@@ -87,7 +87,7 @@ def read_live_settings(entry,settings):
     except (OSError,ValueError,configparser.Error):return settings
     if not config.has_section('Graphics'):return settings
     values={}
-    for key,field in [('PerformanceHud','performance_hud'),('SmoothInterpolation','smooth_interpolation'),('XboxPrompts','xbox_prompts')]:
+    for key,field in [('PerformanceHud','performance_hud'),('XboxPrompts','xbox_prompts')]:
         try:
             value=config.getint('Graphics',key)
             if value in (0,1):values[field]=bool(value)

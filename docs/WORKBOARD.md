@@ -91,3 +91,14 @@ OptiPort reference: `MatyMeatBoy/OptiPort`, main commit `9673006504bf6712b320da7
 - Complete controller prompt mapping, launcher visual QA, packaging and English documentation refresh. VRS and temporal AA remain unimplemented.
 
 This board distinguishes implementation from acceptance; it is not a claim that the complete engine has been fixed or recompiled.
+
+### Pre.4 controller and import pass
+
+- Read-only private executable replacement and interrupted pre.3 patch recovery now pass Windows fault-injection tests and disposable owner-file checks. Original files remain unchanged; no elevation is requested.
+- Select / View releases a video-skip pulse only while the native movie state is active. Start remains pause; Start + Select consumes both standalone actions and opens settings. Python gesture tests and the native foreground/movie gate pass. Physical-controller movie acceptance remains pending.
+- Four separate SDL-to-DirectInput gamepad slots replace gameplay keyboard emulation. The original input manager accepts up to sixteen pads, so four fit without changing that limit. Separate COM device-state tests pass; actual four-player assignment remains an acceptance item.
+- Removed the permanent controller legend and Smooth Mode option. Legacy saved Smooth Mode preferences are forced off. Widescreen defaults on; original-ratio mode now has explicit physical presentation mapping and letterboxing math tests.
+- Controller cursor ownership has native checks: actual mouse movement restores it; background windows and pointer positions outside the game client cannot hide it.
+- Menu grid extension and original numeric-button replacement have synthetic GPU controls; actual loading/pause captures are pending.
+- A separately documented server/client foundation supplies four-seat, two-per-team rooms, ready/start barriers and bounded frame-tagged input relay. Six loopback tests pass. Engine synchronization, playable online matches and WAN latency remain pending; the launcher does not advertise online gameplay as ready.
+- Current aggregate verification: 113 Python checks pass with one Windows symlink-permission skip; fifteen native checks pass. These counts do not establish physical-controller, online-gameplay or all-map acceptance.

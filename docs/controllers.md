@@ -1,68 +1,125 @@
 # Controllers
 
-The launcher uses the bundled SDL3 runtime, including its XInput, DirectInput and
-HIDAPI backends. Recognized gamepads use SDL's standardized Xbox positions.
-Unrecognized devices use the raw joystick fallback. Discovery refreshes every
-half second, releases disconnected devices, and chooses the selected device or
-the first available device. Controller input is written only to the game's
-private DirectInput mailbox while its process owns the foreground window.
-No desktop keyboard input is synthesized.
+Controllers stay separate from the physical keyboard. SDL reads up to four
+physical pads and publishes four independent states. The game's private
+DirectInput proxy exposes one device with its own GUID for each connected slot;
+it suppresses duplicate physical-pad enumeration while that route is active.
+No system-wide virtual driver is installed and no desktop keys are synthesized.
 
-| Xbox input | Menus/settings | Match |
+Both the left stick and D-pad feed the same movement axes for that pad. The
+D-pad is consumed before native input is published; it cannot also move a
+keyboard player or become a second POV direction. Existing connected pads keep
+their slots when another pad disconnects. A fifth controller is reported as
+outside the four-pad limit rather than combined with another controller.
+
+The original game's controller-assignment screen assigns these independent
+sources to player seats. Its input manager can enumerate sixteen pads in addition
+to keyboard/mouse, and the Windows manual supports up to four players in Quick
+Start/Friendly mode. A keyboard remains an independent source; four simultaneous
+player seats are not five seats when a keyboard is also connected.
+
+## Controls
+
+Gameplay follows the PS2 button positions, shown with Xbox letters:
+
+| Xbox input | PS2 position | Action |
 | --- | --- | --- |
-| A | Confirm | S |
-| B | Back | D |
-| X / Y | — | A / W |
-| LB / RB | Settings section previous/next | Q / Shift |
-| D-pad or left stick | Navigate | Move |
-| Start | Pause on release | Pause on release |
-| View/Select + Start | Open/close settings | Open/close settings |
+| A | Cross | Pass / tackle / run toward ball |
+| B | Circle | Shoot |
+| X | Square | Long ball |
+| Y | Triangle | Power-up |
+| LB | L1 | Sprint |
+| RB | R1 | Switch player / skill move |
+| Left stick or D-pad | Left stick or D-pad | Move / aftertouch |
+| Start / Menu | Start | Pause, on release |
+| View / Select | Select | Skip a cinematic, on release |
+| View + Start | Select + Start | Open/close internal settings |
 
-Start is reserved until release so either order of the settings chord suppresses
-pause completely. The chord emits F1 once and rearms after both buttons are
-released. Gesture pulses last 80 ms so normal game polling can observe them.
-Start does not emit pause while settings are open. F1 on a physical keyboard also
-opens settings through the native runtime.
+PC menus use A to confirm and B to go back. Native menu/match layouts switch
+from the published game state; the original pause-menu flags select menu controls
+without waiting for the simulation heartbeat to expire. The launcher's manual
+mode remains a fallback for an unrecognized native state. Internal settings
+always consume pad input and use A/B, stick/D-pad and LB/RB section navigation.
 
-## Launcher integration
+Start and View are both deferred until release. Pressing their chord in either
+order consumes both standalone actions and emits F1 once, rearming after both
+buttons are released. Standalone View emits only a movie-gated private Escape
+command; it is not also sent as a native pad button. Start is only a native pad
+pause button. Held inputs are blocked across settings/menu context changes until
+released, preventing a settings action from becoming an in-game action.
+
+The mappings are checked against the original
+[Windows manual](https://oldgamesdownload.com/manual/football-mania-windows-manual-english/)
+and [PS2 manual](https://www.videogamemanual.com/PS2/LEGO%20Soccer%20Mania%20%28USA%29.pdf).
+The virtual device reports the exact legacy Gravis instance name so the original
+game selects its verified button profile. Its product label and four private
+GUIDs identify the OpenSoccerMania devices; it does not impersonate hardware
+outside this game's process.
+
+## Runtime and integration
 
 `ControllerBridge(root, pid=None, log=None)` retains `start()`, `stop()`,
-`enabled`, `selected_id`, `devices`, `status`, `deadzone`, `mapping` and `mode`.
-`devices` entries contain `id`, `name`, and `mapped`. `automatic_mode` defaults
-to true. Native gameplay state selects Match automatically; native menu state
-selects Menu. Setting `automatic_mode=False` honors the manual `mode` outside
-the settings panel. Without a valid native UI page, `mode` is the fallback.
-The settings panel always uses Menu controls, including when manually overridden.
+`enabled`, `selected_id`, `devices`, `status`, `deadzone`, `mode` and
+`automatic_mode`. Device entries include `id`, `name`, `mapped`, and `slot`
+(1â€“4, or `None` beyond the limit). `selected_id` chooses settings navigation,
+not a source to aggregate into gameplay. Every assigned pad is published.
 
-`mapping` maps Menu/Match names to SDL button-index/key-name dictionaries.
-View (4) and Start (6) are reserved for settings/pause. `raw_mapping` translates
-raw device button indices to SDL gamepad indices; its default assumes the common
-Xbox raw order (A/B/X/Y, LB/RB, View/Start, stick clicks). Raw hats supply D-pad
-navigation and the first two axes supply movement. Nonstandard raw layouts need
-a device-specific `raw_mapping`; no universal raw button numbering exists.
-Stick deadzone is configurable and constrained to 0.05–0.95 by the worker.
+Recognized SDL gamepads use standardized positions. `raw_mapping` translates
+unrecognized joystick button indices into SDL positions; the default assumes a
+common Xbox raw layout. Raw hats and the first two axes also work. Nonstandard
+adapters require a matching raw profile; raw button numbering is not universal.
+The worker constrains the stick deadzone to 0.05â€“0.95.
+
+The native proxy waits at most 300 ms for the SDL producer at initial discovery.
+If it is unavailable, the proxy preserves the original physical DirectInput
+route. Once chosen, it keeps one route for the process so late discovery cannot
+create duplicate pads. The virtual route detects a stopped producer within
+500 ms, neutralizes state, and reports disconnected input. An in-progress page
+write uses the last fresh stable state rather than spuriously disconnecting a pad.
 
 ## Private protocols
 
-Input: `Local\OpenSoccerMania-Input-<pid>`, 272 bytes. DWORD magic
-`0x494d534f`, sequence, flags, reserved, followed by 256 DirectInput key bytes.
-Flags: 1 enabled, 2 explicit private test, 4 connected selected controller.
-`InputMailbox.write(keys, enabled=True, background_test=False,
-controller_present=False)` preserves the old callers and packet size. Sequence
-is odd during publication and even when stable. F1 uses DIK 0x3b.
+Keyboard/settings: `Local\OpenSoccerMania-Input-<pid>`, 272 bytes. Four DWORDs:
+magic `0x494d534f`, sequence, flags, controller-activity serial, followed by 256
+DirectInput key bytes. Flags are 1 enabled, 2 explicit private diagnostics,
+4 controller connected, 8 recent controller activity, 16 explicit movie skip.
+The activity serial changes on actual controller input transitions, never device
+presence. Its default remains zero for existing diagnostic callers.
 
-UI state: `Local\OpenSoccerMania-UI-<pid>`, 32 bytes, eight little-endian DWORDs:
-magic `0x554d534f`, version 1, flags, revision, four reserved. Flag 1 indicates
-settings open; flag 2 indicates gameplay active. The controller reads this page
-without modifying its contents. Invalid or unstable pages fall back to manual
-mode. Native gameplay detection is heuristic; the manual override remains
-available for screens whose original state cannot be recognized reliably.
+`InputMailbox.write(keys, enabled=True, background_test=False,
+controller_present=False, controller_active=False, activity_serial=0,
+movie_skip=False)` preserves the packet size. Outside internal settings, native
+keyboard merging accepts full keys only with explicit diagnostic flag 2. Movie
+flag 16 permits only Escape and only while the native movie flag is active.
+Gameplay movement/actions never travel through this keyboard page.
+
+Pads: `Local\OpenSoccerMania-Pads-<pid>`, 160 bytes. Eight header DWORDs: magic
+`0x504d534f`, version 1, sequence, flags, four reserved. Flag 1 enables input;
+flag 2 selects match button layout. Four 32-byte slots follow: SDL instance ID,
+connected flag, signed X/Y in -32767â€¦32767, standardized SDL button mask, and
+three reserved DWORDs. Mask bits 15/16 represent left/right triggers. D-pad bits
+are absent because movement has already been resolved into X/Y. An absent slot
+is all zero. The native reader honors each device's requested data format and
+axis ranges, returns neutral POVs and unused velocity/acceleration/force axes,
+and preserves slot identity through native device creation.
+
+UI: `Local\OpenSoccerMania-UI-<pid>`, 32 bytes, eight little-endian DWORDs:
+magic `0x554d534f`, version 1, flags, revision, four reserved. Flags are 1 settings
+open, 2 gameplay active, 4 movie active. The controller only opens an existing
+mapping and never creates a read-only page before the native publisher.
 
 ## Verification limits
 
-Unit tests cover Xbox bindings, deadzones, mode selection, chord ordering/hold/
-release, and actual Windows mailbox flags/F1 scan codes. The SDL worker has been
-smoke-tested with the bundled DLL and no attached devices, without opening the
-game or generating OS input. Physical controllers, wireless reconnects and
-vendor-specific raw layouts require hardware verification. SDL backend support
-is not a claim that every controller model has been tested.
+Python regressions cover independent stable slots, one movement channel,
+keyboard isolation, the page layouts, serials, wraparound, both chord orders,
+held/released gestures and settings state. Native regressions cover four distinct
+GUIDs/states, the game's standard 272-byte/164-object format, PS2/legacy button
+translation, menu changes, axis ranges, buffered input, focus, panel handoff,
+disconnects, stale/unstable pages, and movie-gated Escape. An additional headless
+run loads the actual proxy DLL and exercises four devices through the real system
+DirectInput factory. Missing and late producers have separate regressions.
+
+These checks do not constitute a four-physical-controller match test. Physical
+hardware, wireless reconnects, vendor-specific raw layouts and live four-player
+seat assignment still require verification with the owner's controllers. No
+online transport is introduced by this local four-slot input protocol.

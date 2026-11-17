@@ -51,6 +51,10 @@ int main() {
         assert(!reader.panel_open() && view->flags==2 && view->revision==4);
         publisher.publish(true,false);
         assert(reader.panel_open() && view->flags==1);
+        publisher.publish(false,false,true);
+        assert(reader.movie_active() && !reader.panel_open() && view->flags==4);
+        publisher.publish(false,false,false);
+        assert(!reader.movie_active());
     }
     assert(view->magic==0 && view->flags==0); // destructor invalidates surviving views
     assert(!reader.panel_open());

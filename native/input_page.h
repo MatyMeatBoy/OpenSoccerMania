@@ -18,8 +18,15 @@ public:
         const auto* words=reinterpret_cast<const volatile DWORD*>(memory_);
         return words[0]==0x494d534f&&!(words[1]&1)&&(words[2]&4);
     }
+    DWORD controller_activity(bool& active)const {
+        active=false;if(!memory_)return 0;
+        const auto* words=reinterpret_cast<const volatile DWORD*>(memory_);
+        const DWORD sequence=words[1],flags=words[2],serial=words[3];MemoryBarrier();
+        if(words[0]!=0x494d534f||(sequence&1)||words[1]!=sequence)return 0;
+        active=(flags&9)==9;return serial;
+    }
     ~PrivateKeyboard(){if(memory_)UnmapViewOfFile(memory_);if(mapping_)CloseHandle(mapping_);}
-    SHORT state(int key,bool focused) {
+    SHORT state(int key,bool focused,bool movie=false) {
         if(key<0||key>255)return 0;
         if(!memory_&&GetTickCount64()>=retry_) {
             retry_=GetTickCount64()+1000;
@@ -34,8 +41,9 @@ public:
             const DWORD sequence=words[1],flags=words[2];
             if(words[0]==0x494d534f&&!(sequence&1)&&(flags&1)&&((flags&2)||focused)) {
                 UINT scan=MapVirtualKeyW(key,MAPVK_VK_TO_VSC);
-                if(key==VK_LEFT||key==VK_RIGHT||key==VK_UP||key==VK_DOWN)scan|=0x80;
+                if(key==VK_LEFT||key==VK_RIGHT||key==VK_UP||key==VK_DOWN||key==VK_PRIOR||key==VK_NEXT)scan|=0x80;
                 if(scan<256){const bool value=(memory_[16+scan]&0x80)!=0;MemoryBarrier();pressed=words[1]==sequence&&value;}
+                if(key==VK_ESCAPE&&(flags&16)&&!movie)pressed=false;
             }
         }
         const bool edge=pressed&&!down_[key];down_[key]=pressed;

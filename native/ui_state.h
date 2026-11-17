@@ -33,9 +33,9 @@ public:
         InterlockedExchange(reinterpret_cast<volatile LONG*>(&page_->magic),ui_state_magic);
         return true;
     }
-    void publish(bool panel_open,bool gameplay) {
+    void publish(bool panel_open,bool gameplay,bool movie=false) {
         if(!page_)return;
-        InterlockedExchange(reinterpret_cast<volatile LONG*>(&page_->flags),(panel_open?1:0)|(gameplay?2:0));
+        InterlockedExchange(reinterpret_cast<volatile LONG*>(&page_->flags),(panel_open?1:0)|(gameplay?2:0)|(movie?4:0));
         InterlockedIncrement(reinterpret_cast<volatile LONG*>(&page_->revision));
     }
     void close() {
@@ -60,7 +60,7 @@ public:
     UiStateReader(const UiStateReader&)=delete;
     UiStateReader& operator=(const UiStateReader&)=delete;
     ~UiStateReader(){release();}
-    bool panel_open() {
+    DWORD flags() {
         if(!page_) {
             const auto now=GetTickCount64();
             if(now<next_attempt_)return false;
@@ -75,7 +75,9 @@ public:
         const DWORD flags=page_->flags;
         MemoryBarrier();
         if(page_->magic!=ui_state_magic || page_->version!=ui_state_version){release();return false;}
-        return (flags&1)!=0;
+        return flags;
     }
+    bool panel_open(){return (flags()&1)!=0;}
+    bool movie_active(){return (flags()&4)!=0;}
 };
 } // namespace osm

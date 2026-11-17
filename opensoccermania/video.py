@@ -25,7 +25,7 @@ class VideoSettings:
     filtering: str = '16× anisotropic'
     vsync: bool = True
     fullscreen: bool = False
-    horplus: bool = False
+    horplus: bool = True
     display_mode: str | None = None
     performance_hud: bool = True
     overlay_scale: int = 125
@@ -35,7 +35,7 @@ class VideoSettings:
     auto_aspect: bool = True
     sprite_seam_fix: bool = True
     modern_presentation: bool = True
-    smooth_interpolation: bool = True
+    smooth_interpolation: bool = False  # Accept old preferences; feature retired.
     camera_zoom: str = 'Original zoom'
     xbox_prompts: bool = True
     edition: str = 'Football Mania'
@@ -47,6 +47,7 @@ class VideoSettings:
         return self.display_mode or ('Fullscreen' if self.fullscreen else 'Windowed')
 
     def __post_init__(self):
+        self.smooth_interpolation=False
         if not (640 <= self.width <= 3840 and 480 <= self.height <= 2160 and self.refresh in REFRESH_RATES):
             raise ValueError('Choose a resolution up to 3840 × 2160 and a refresh rate from 60 to 240 Hz.')
         if self.aa not in AA_MODES or self.filtering not in FILTER_MODES:

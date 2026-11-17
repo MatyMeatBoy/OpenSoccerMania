@@ -6,6 +6,8 @@
 #include <cstring>
 #include "ui_state.h"
 #include "hook_chain.h"
+#include "virtual_pad.h"
+#include <unordered_map>
 
 using Factory=HRESULT (WINAPI *)(HINSTANCE,DWORD,REFIID,void**,LPUNKNOWN);
 using CreateDevice=HRESULT (WINAPI *)(void*,REFGUID,void**,LPUNKNOWN);
@@ -22,8 +24,46 @@ static HANDLE input_mapping=nullptr;
 static const unsigned char* input_memory=nullptr;
 static bool keyboard_state_logged=false;
 static osm::UiStateReader ui_state;
+static osm::PadReader pad_reader;
+using EnumDevices=HRESULT (WINAPI *)(void*,DWORD,LPDIENUMDEVICESCALLBACKA,LPVOID,DWORD);
+static EnumDevices original_enum=nullptr;
+static int pad_route=0; // decide once, avoiding duplicate routes if discovery is late
+static bool virtual_pad_route() {
+    if(pad_route)return pad_route>0;
+    const auto deadline=GetTickCount64()+300;osm::PadPage page={};
+    do {if(pad_reader.snapshot(page)){pad_route=1;FILE* file=std::fopen(log_path,"a");if(file){std::fprintf(file,"CONTROLLER_ROUTE SDL-four-device protocol=1 keyboard-emulation=0\n");std::fclose(file);}return true;}Sleep(5);}while(GetTickCount64()<deadline);
+    pad_route=-1;FILE* file=std::fopen(log_path,"a");if(file){std::fprintf(file,"CONTROLLER_ROUTE native-fallback reason=SDL-page-unavailable\n");std::fclose(file);}return false; // SDL unavailable: preserve the original native devices
+}
+static std::unordered_map<void**,DeviceState> state_methods;
+static std::unordered_map<void**,Cooperative> cooperative_methods;
+struct EnumFilter {LPDIENUMDEVICESCALLBACKA callback;LPVOID context;bool stopped=false;};
+static BOOL CALLBACK enum_nonpads(LPCDIDEVICEINSTANCEA info,LPVOID context) {
+    auto& filter=*static_cast<EnumFilter*>(context);
+    const DWORD kind=LOBYTE(info->dwDevType);
+    if(kind!=DI8DEVTYPE_KEYBOARD&&kind!=DI8DEVTYPE_MOUSE)return DIENUM_CONTINUE;
+    const BOOL result=filter.callback(info,filter.context);
+    if(result==DIENUM_STOP)filter.stopped=true;
+    return result;
+}
+static HRESULT WINAPI enum_devices(void* api,DWORD kind,LPDIENUMDEVICESCALLBACKA callback,LPVOID context,DWORD flags) {
+    if(!callback)return DIERR_INVALIDPARAM;
+    const bool wants_pads=kind==DI8DEVCLASS_ALL||kind==DI8DEVCLASS_GAMECTRL||kind==DI8DEVTYPE_GAMEPAD||kind==DI8DEVTYPE_JOYSTICK;
+    if(wants_pads&&!virtual_pad_route())return original_enum(api,kind,callback,context,flags);
+    EnumFilter filter{callback,context};
+    const HRESULT result=original_enum(api,kind,enum_nonpads,&filter,flags);
+    if(FAILED(result)||filter.stopped)return result;
+    if(!wants_pads)return result;
+    for(unsigned slot=0;slot<4;++slot) {
+        osm::PadState state={};if(!pad_reader.read(slot,state))continue;
+        DIDEVICEINSTANCEA info={};osm::pad_info(slot,info);
+        if(callback(&info,context)==DIENUM_STOP)break;
+    }
+    return DI_OK;
+}
 static HRESULT WINAPI device_state(void* device,DWORD size,LPVOID data) {
-    HRESULT result=original_state(device,size,data);
+    DeviceState poll=original_state;
+    if(device){const auto method=state_methods.find(*reinterpret_cast<void***>(device));if(method!=state_methods.end())poll=method->second;}
+    HRESULT result=poll(device,size,data);
     // Poll the real device first, preserving acquisition/focus side effects.
     // Only recognized keyboard/mouse packet shapes have an all-zero neutral state.
     if(data && (size==256 || size==sizeof(DIMOUSESTATE) || size==sizeof(DIMOUSESTATE2)) && ui_state.panel_open()) {
@@ -41,12 +81,15 @@ static HRESULT WINAPI device_state(void* device,DWORD size,LPVOID data) {
     const auto* words=reinterpret_cast<const volatile DWORD*>(input_memory);
     const DWORD sequence=words[1],flags=words[2];
     if(words[0]!=0x494d534f || (sequence&1) || !(flags&1))return result;
-    if(!(flags&2) && GetForegroundWindow()!=game_window)return result;
+    const bool diagnostic=(flags&2)!=0;
+    const bool movie_skip=(flags&16)&&ui_state.movie_active();
+    if(!diagnostic&&!movie_skip)return result;
+    if(!diagnostic&&GetForegroundWindow()!=game_window)return result;
     unsigned char keys[256];std::memcpy(keys,input_memory+16,256);MemoryBarrier();
     if(words[1]!=sequence)return result;
     if(FAILED(result))std::memset(data,0,256);
     auto* state=static_cast<unsigned char*>(data);
-    for(unsigned i=0;i<256;++i)state[i]|=keys[i];
+    for(unsigned i=0;i<256;++i)if(diagnostic||i==DIK_ESCAPE)state[i]|=keys[i];
     return DI_OK;
 }
 
@@ -67,18 +110,41 @@ static HRESULT WINAPI cooperative(void* device,HWND window,DWORD flags) {
         flags |= DISCL_NONEXCLUSIVE|DISCL_FOREGROUND;
         ClipCursor(nullptr);ReleaseCapture();
     }
-    HRESULT result=original_cooperative(device,window,flags);
+    Cooperative call=original_cooperative;
+    const auto method=cooperative_methods.find(*reinterpret_cast<void***>(device));if(method!=cooperative_methods.end())call=method->second;
+    HRESULT result=call(device,window,flags);
     FILE* file=std::fopen(log_path,"a");
     if(file){std::fprintf(file,"cooperative requested=0x%lx applied=0x%lx result=0x%lx\n",requested,flags,static_cast<unsigned long>(result));std::fclose(file);}
     return result;
 }
 
 static HRESULT WINAPI create_device(void* api,REFGUID guid,void** result,LPUNKNOWN outer) {
+    const int slot=osm::pad_guid_slot(guid);
+    if(slot>=0) {
+        if(!result)return E_POINTER;*result=nullptr;
+        if(outer)return CLASS_E_NOAGGREGATION;
+        osm::PadState state={};if(!pad_reader.read(unsigned(slot),state))return DIERR_DEVICENOTREG;
+        auto* pad=new(std::nothrow) osm::VirtualPad(unsigned(slot),pad_reader,&ui_state);
+        if(!pad)return E_OUTOFMEMORY;*result=static_cast<IDirectInputDevice8A*>(pad);return DI_OK;
+    }
     HRESULT status=original_create(api,guid,result,outer);
     if(SUCCEEDED(status) && result && *result) {
         auto table=*reinterpret_cast<void***>(*result);
-        replace(&table[13],reinterpret_cast<void*>(cooperative),reinterpret_cast<void**>(&original_cooperative));
-        replace(&table[9],reinterpret_cast<void*>(device_state),reinterpret_cast<void**>(&original_state));
+        using Caps=HRESULT (WINAPI *)(void*,LPDIDEVCAPS);
+        DIDEVCAPS caps={};caps.dwSize=sizeof(caps);
+        if(SUCCEEDED(reinterpret_cast<Caps>(table[3])(*result,&caps))) {
+            const DWORD kind=LOBYTE(caps.dwDevType);
+            if(kind!=DI8DEVTYPE_KEYBOARD&&kind!=DI8DEVTYPE_MOUSE&&virtual_pad_route()) {
+                reinterpret_cast<ULONG (WINAPI *)(void*)>(table[2])(*result);*result=nullptr;return DIERR_DEVICENOTREG;
+            }
+        }
+        if(cooperative_methods.find(table)==cooperative_methods.end()) {
+            Cooperative call=nullptr;DeviceState poll=nullptr;
+            replace(&table[13],reinterpret_cast<void*>(cooperative),reinterpret_cast<void**>(&call));
+            replace(&table[9],reinterpret_cast<void*>(device_state),reinterpret_cast<void**>(&poll));
+            cooperative_methods[table]=call;state_methods[table]=poll;
+            if(!original_cooperative)original_cooperative=call;if(!original_state)original_state=poll;
+        }
     }
     return status;
 }
@@ -99,6 +165,7 @@ extern "C" HRESULT WINAPI DirectInput8Create(HINSTANCE instance,DWORD version,RE
     if(SUCCEEDED(status)&&result&&*result) {
         auto table=*reinterpret_cast<void***>(*result);
         replace(&table[3],reinterpret_cast<void*>(create_device),reinterpret_cast<void**>(&original_create));
+        replace(&table[4],reinterpret_cast<void*>(enum_devices),reinterpret_cast<void**>(&original_enum));
     }
     return status;
 }

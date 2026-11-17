@@ -65,9 +65,56 @@ class SettingsGestureTests(unittest.TestCase):
   writer=mmap.mmap(-1,32,tagname=reader.name)
   try:
    writer[:]=struct.pack('<8I',0x554d534f,1,3,12,0,0,0,0)
-   self.assertEqual(reader.read(),{'panel_open':True,'gameplay_active':True,'revision':12})
+   self.assertEqual(reader.read(),{'panel_open':True,'gameplay_active':True,'movie_active':False,'revision':12})
    writer[:]=bytes(32)
    self.assertIsNone(reader.read())
   finally:
    reader.close()
    writer.close()
+
+
+class NativePadTransportTests(unittest.TestCase):
+ def test_gameplay_never_becomes_keyboard_input(self):
+  from opensoccermania.controllers import overlay_keys
+  for buttons,axes in [({0,1,2,3,9,10,11,14},(1.,-1.)),(set(),(-1.,1.))]:
+   self.assertEqual(overlay_keys(buttons,axes,False,.2),set())
+  self.assertEqual(overlay_keys({0},(1.,0.),False,.2,{'F1'}),{'F1'})
+  self.assertEqual(overlay_keys({0,11},(0.,0.),True,.2),{'Enter','Up'})
+ def test_stick_and_hat_use_one_axis_channel(self):
+  from opensoccermania.controllers import pad_axes
+  self.assertEqual(pad_axes({14},(1.,0.),.2),(32767,0))
+  self.assertEqual(pad_axes({11,13},(0.,0.),.2),(-32767,-32767))
+  self.assertEqual(pad_axes(set(),(.1,-.1),.2),(0,0))
+ def test_four_devices_keep_separate_stable_slots(self):
+  from opensoccermania.controllers import PadSlots
+  slots=PadSlots()
+  self.assertEqual(slots.update([91,17]),(17,91,None,None))
+  self.assertEqual(slots.update([91,17,2,3]),(17,91,2,3))
+  self.assertEqual(slots.update([91,2,3]),(None,91,2,3))
+  self.assertEqual(slots.update([91,2,3,100,101]),(100,91,2,3))
+ def test_native_page_preserves_each_pad_and_activity_serial(self):
+  import os,struct
+  from opensoccermania.controllers import PadMailbox,InputMailbox
+  pads=PadMailbox(os.getpid());keys=InputMailbox(os.getpid())
+  try:
+   pads.write([(17,32767,0,1),(91,-32767,0,4),None,(3,0,-32767,2)])
+   self.assertEqual(struct.unpack('<4I',pads.page[:16]),(0x504d534f,1,2,1))
+   self.assertEqual(struct.unpack('<IIiiIIII',pads.page[32:64])[:5],(17,1,32767,0,1))
+   self.assertEqual(struct.unpack('<IIiiIIII',pads.page[64:96])[:5],(91,1,-32767,0,4))
+   self.assertEqual(pads.page[96:128],bytes(32))
+   keys.write(set(),controller_present=True,controller_active=True,activity_serial=42)
+   self.assertEqual(struct.unpack('<II',keys.page[8:16]),(13,42))
+   pads.sequence=keys.sequence=0xfffffffe
+   pads.write([],False);keys.write(set(),False)
+   self.assertEqual(struct.unpack('<I',pads.page[8:12])[0],0)
+   self.assertEqual(struct.unpack('<I',keys.page[4:8])[0],0)
+  finally:pads.close();keys.close()
+ def test_view_releases_for_movie_skip_but_chord_consumes_it(self):
+  from opensoccermania.controllers import SettingsChord
+  chord=SettingsChord()
+  self.assertEqual(chord.update({4})[1],set())
+  self.assertEqual(chord.update(set())[1],{'Escape'})
+  self.assertEqual(chord.update(set())[1],set())
+  self.assertEqual(chord.update({4,6})[1],{'F1'})
+  self.assertEqual(chord.update({4})[1],set())
+  self.assertEqual(chord.update(set())[1],set())
