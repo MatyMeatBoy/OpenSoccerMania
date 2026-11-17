@@ -40,7 +40,7 @@ def main():
     try:
         cases = ('screen_render', 'world_effects_render', 'settings_render',
                  'menu_background_render', 'title_render', 'layered_com',
-                 'layered_window', 'input_mailbox', 'device_reset', 'clear_rect', 'save_metadata_runtime', 'portable_imports')
+                 'layered_window', 'input_mailbox', 'device_reset', 'shader_reset', 'clear_rect', 'save_metadata_runtime', 'portable_imports')
         for name in cases:
             directory = workspace / name
             directory.mkdir()

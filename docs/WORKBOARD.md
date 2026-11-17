@@ -5,6 +5,21 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.5. See
 
 ## Continuation verification, 2026-11-17
 
+- Added an asset-free retained-programmable-shader Reset case. Its own shader
+  uses the fallback projection epilogue; center-color and black-margin GPU
+  readback verify both drawing and aspect correction before and after two
+  successful Reset calls. This route already passes without a production
+  change; the suspected lost-constant failure was not reproduced. All twenty-two
+  integration cases pass (`gpu-vodp56a6`), with independent review finding no
+  actionable introduced issues. This does not establish every shader/state path.
+- A longer 1000-second Story probe reloads the configured team and observes
+  two opponent goals with visible returns to kickoff. It closes cleanly with
+  unchanged save hashes, but reaches the harness deadline before a final result.
+  The global options screen was set to 4:00/power-ups off; effective Story-mode
+  use of those preferences is not established. Evidence:
+  `story-progress-short/summary.json` under the private evidence root. It does
+  not accept a completed match or progression. A late command 41 is excluded;
+  subsequent acceptance must allow for explicit replay-continuation waits.
 - Projection state after Reset: the bare pinned backend restores its initial
   projection, but the bridge's GetTransform continued returning its cached
   pre-reset matrix. A new production-DLL assertion fails before correction
