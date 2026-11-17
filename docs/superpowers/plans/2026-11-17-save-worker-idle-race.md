@@ -23,7 +23,10 @@ signature-scoped guard, all 27 integration cases, 125 Python tests and independe
 review of the emitted assembly. Three fresh patched owner-game loads read their
 full payload, leave save hashes unchanged and close with exit zero. The fixture's
 stop control reaches the yield continuation, not the full original thread exit.
-Story progression and causality of every observed load failure remain unproven.
+The observed City Park → Western Junction checkpoint also survives a separate
+process loading the changed bank; both processes close cleanly and reload leaves
+the saved bytes unchanged. Broader campaign/tournament progression and causality
+of every observed load failure remain unproven.
 
 1. Reproduce the lost-request window deterministically with synthetic executable
    padding and the production DLL. Model a zero snapshot and a newly queued

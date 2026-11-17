@@ -5,6 +5,23 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.5. See
 
 ## Continuation verification, 2026-11-17
 
+- A real Story checkpoint now survives a fresh-process reload. The private game
+  starts at City Park, plays through multiple goals/replays and reaches Western
+  Junction without manual pitch cycling. Only SAVE0000.SAV changes; the changed
+  bank is preserved across clean close. A new process loads all 4800 payload
+  bytes successfully and enters Story directly at Western Junction. Reload and
+  the second clean close leave all save hashes unchanged. Evidence:
+  `story-worker-fixed/summary.json` and `story-progress-reloaded/summary.json`,
+  with map captures 3/12 in the first probe and 3 in the second. The final match
+  score was not visually captured. This accepts the observed checkpoint round
+  trip, not the full campaign, tournament progression or every load failure.
+- Exact source commit `9f4a5a2` passes public CI run `44156966977`. An internal
+  immutable source ZIP includes the new worker/shader fixtures and branding;
+  all 231 inventoried file sizes/hashes verify, and its extracted tree runs
+  125 tests with two expected skips. Report:
+  `build/tests/source-check-9f4a5a2/verification.json`. This validation artifact
+  does not replace the published pre.5 release. All owned game probes are closed
+  after the Story reload verification.
 - Captured another real LOAD FAILED before any profile payload read, followed by
   a successful retry in the same process. External trace shows load phase 1,
   phase 2, then phase 14 with operation result 2 and status 0; expected/read bytes
@@ -37,8 +54,9 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.5. See
   The synchronous save-status logger is disabled; external read-only sampling
   and the engine's startup guard marker identify the tested path. Evidence:
   `save-worker-load-1/` through `save-worker-load-3/` summaries in the private
-  evidence root. A fourth process also loads successfully and is exercising
-  Story. These selected real loads and process closes support the correction;
+  evidence root. A fourth process also loaded successfully and exercised Story;
+  the checkpoint round trip above supersedes its earlier in-progress status.
+  These selected real loads and process closes support the correction;
   they do not prove all failure modes or instrument the full worker-exit body.
 - Added an asset-free retained-programmable-shader Reset case. Its own shader
   uses the fallback projection epilogue; center-color and black-margin GPU

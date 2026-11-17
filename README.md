@@ -27,7 +27,7 @@ OpenSoccerMania gives your own game files a new desktop launcher and an incremen
 | Launcher | English interface, rounded controls, textured football artwork and local settings. |
 | Import | Private folder imports and content-checked ISO9660/raw-sector images, with read-only mounting or bounded extraction. See [supported layouts and limits](docs/disc-import.md); real image acceptance remains open. |
 | Preservation | Private copies, executable hashes, original backups and reversible version-locked startup patches. |
-| Startup | The supported private copy reaches menus and active gameplay. An ice-field match reaches final statistics and returns to Main Menu. Story team configuration reloads; intermittent load failure and completed-mission persistence remain open. |
+| Startup | The supported private copy reaches menus and active gameplay. An ice-field match reaches final statistics and returns to Main Menu. Post-pre.5 source also verifies a City Park → Western Junction Story checkpoint across a fresh-process reload. Broader campaign/tournament persistence and load recovery remain open. |
 | Modern output | D3D8 commands translated to Direct3D 11 through the bundled dgVoodoo backend; native instrumentation confirmed 1920×1080 render targets with 4× MSAA. |
 | Window modes | Windowed by default, borderless and explicit fullscreen. Windowed startup was checked with unchanged desktop dimensions. |
 | Languages | Nine text variants and eight voice directories, including Spanish. American and English share one English voice directory; selection behavior remains under investigation. |
