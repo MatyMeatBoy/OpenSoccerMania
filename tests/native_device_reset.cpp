@@ -23,6 +23,8 @@ int main(int argc,char** argv){
         check(desc.Width==width&&desc.Height==height,"Reset must restore logical backbuffer identity before the game queries its current target");
     };
     logical_target(640,480);
+    D3DMATRIX initial_projection={};
+    check(SUCCEEDED(device->GetTransform(D3DTS_PROJECTION,&initial_projection)),"Initial projection state");
     check(device->Reset(nullptr)==D3DERR_INVALIDCALL,"Null reset parameters are rejected");
     logical_target(640,480);
     const auto resize_client=[&]{
@@ -48,6 +50,8 @@ int main(int argc,char** argv){
     if(adaptive){resize_client();adaptive_pixels(640,480);}
     const unsigned sizes[][2]={{640,480},{1280,720},{1024,768},{640,480}};
     for(const auto& size:sizes){
+        D3DMATRIX supplied={};supplied._11=2;supplied._22=3;supplied._33=4;supplied._34=1;supplied._43=-1;
+        check(SUCCEEDED(device->SetTransform(D3DTS_PROJECTION,&supplied)),"Set projection before reset");
         // Invalid color-buffer formats must fail without preventing a later
         // valid reset. Do not issue draw/state calls while the device is lost.
         D3DPRESENT_PARAMETERS invalid=params;
@@ -56,6 +60,8 @@ int main(int argc,char** argv){
         check(FAILED(device->Reset(&invalid)),"Reject invalid reset before retry");
         params.BackBufferWidth=size[0];params.BackBufferHeight=size[1];
         check(SUCCEEDED(device->Reset(&params)),"Reset device");
+        D3DMATRIX projection={};check(SUCCEEDED(device->GetTransform(D3DTS_PROJECTION,&projection)),"Projection after reset");
+        check(std::memcmp(&projection,&initial_projection,sizeof(projection))==0,"Reset must discard the previous logical projection");
         if(adaptive){resize_client();adaptive_pixels(size[0],size[1]);}
         logical_target(size[0],size[1]);
         D3DVIEWPORT8 viewport={};check(SUCCEEDED(device->GetViewport(&viewport)),"Viewport after reset");

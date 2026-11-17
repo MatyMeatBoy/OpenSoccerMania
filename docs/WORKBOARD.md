@@ -5,6 +5,15 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.5. See
 
 ## Continuation verification, 2026-11-17
 
+- Projection state after Reset: the bare pinned backend restores its initial
+  projection, but the bridge's GetTransform continued returning its cached
+  pre-reset matrix. A new production-DLL assertion fails before correction
+  (`gpu-mmg3ncmb`) and passes after invalidating that cache on successful Reset
+  (`gpu-xt99a37_`, all twenty-one integration cases). Repeated logical sizes
+  and adaptive/nonadaptive variants are covered. Bare-backend reference output
+  is retained under `reset-transform-reference/` in the private evidence root.
+  Independent review found no actionable introduced issues. This verifies a
+  state-reporting defect, not the cause of the intermittent black replay.
 - Window resize feedback is reproduced and corrected. An owner-game probe
   changes a client to 640x480, after which the backend expands it through
   1440x845 to 1540x845. Temporary, isolated SetWindowPos tracing identifies the

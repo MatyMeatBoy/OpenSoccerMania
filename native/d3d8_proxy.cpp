@@ -523,6 +523,7 @@ static HRESULT WINAPI reset(IDirect3DDevice8* device,D3DPRESENT_PARAMETERS* para
     const HRESULT result=real_reset(device,&physical);
     FILE* file=std::fopen(log_path,"a");if(file){std::fprintf(file,"RESET result=0x%lx size=%ux%u windowed=%d\n",static_cast<unsigned long>(result),physical.BackBufferWidth,physical.BackBufferHeight,physical.Windowed);std::fclose(file);}
     if(SUCCEEDED(result)){
+        have_projection=false;
         // Reset replaces the default render target. Reestablish the same
         // logical/physical mapping used at CreateDevice before game queries
         // or screen-space draws can observe the new surface.
