@@ -5,6 +5,26 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.6. See
 
 ## Continuation verification, 2026-11-17
 
+- Windowed owner-game acceptance on Western Junction now covers two resize /
+  minimize / restore cycles, first at kickoff and then during moving gameplay.
+  Private desktop window receipts confirm exact 1280x540, 800x600 and 960x540
+  clients, actual minimized state and restored dimensions. Read-only UI samples
+  confirm active gameplay through the second cycle; captures show resumed
+  drawing, moving players, F1 settings and a later replay scene. The process
+  closes with exit zero, the input desktop stays unchanged and all copied save
+  hashes remain equal to the seed. Evidence:
+  `local/acceptance-2026-11-17/gameplay-window-pre6/summary.json` and
+  `window-receipts.json`. This is one windowed map; exclusive device loss,
+  physical monitor transitions, replay exit and all-map coverage remain open.
+- Published [pre.6](https://github.com/MatyMeatBoy/OpenSoccerMania/releases/tag/v0.1.0-pre.6)
+  from exact commit `587a7257d32ac84653aeb347611d8b0e86b904fa`; public CI
+  `44162146484` passed. Both extracted archive inventories match their file
+  hashes; the extracted source runs 125 tests (two expected skips) and the
+  extracted portable passes its four-page/import smoke. Downloaded all four
+  public assets and matched their bytes to the server SHA-256 digests. Receipts:
+  `local/release-verification/pre6-build/published-release.json` and
+  `public-download-verification.json`. The release remains a prerelease;
+  outstanding acceptance below is not waived.
 - Pre.6 rebuild passes 125 Python tests (one privilege skip), 21 named native
   CPU checks and 27 fresh GPU/input/import runs (`gpu-s8otsfoi`). The exact
   rebuilt bridge is used by both those runs and the frozen candidate's smoke.
