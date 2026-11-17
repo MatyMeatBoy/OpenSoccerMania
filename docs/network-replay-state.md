@@ -96,3 +96,10 @@ ordered input-refresh/recording observations. Original replay serialization is
 a useful ownership lead, not yet a cross-process snapshot format, complete
 checksum, recovery implementation or playable network adapter. Production input,
 scheduler, seeds and published pre.7 binaries are unchanged.
+
+
+A subsequent [controlled initial-state comparison](network-initial-state.md)
+captures all 18 bucket-0 components in two fresh Friendly setups. Four raw
+components differ; pointer/conditional-write ownership and logical equality
+remain unproven. This comparison advances the initial-state investigation without
+accepting raw aggregate equality as a complete synchronization contract.

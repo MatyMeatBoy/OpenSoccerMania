@@ -5,6 +5,17 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.7. See
 
 ## Continuation verification, 2026-11-17
 
+- Captured the first original bucket-0 state in two fresh, phase-verified Friendly
+  setups: LEGO All Stars/Lawbringers, Western Junction, identical profile/options
+  copies and four pads. All 18 component spans concatenate exactly to 28604 bytes
+  at frame zero, seed/shared RNG 999. Four components differ in 560 raw bytes;
+  214 changed dwords share an allocation-like delta, while two conditional-write
+  words and the separate inline RNG remain unresolved. No unexplained difference
+  is masked or accepted as logical equality. Both processes close cleanly with
+  save hashes/input desktop unchanged; a wrong-menu exploratory run is excluded.
+  See [initial-state comparison](network-initial-state.md) and private
+  `local/netplay-initial-2026-11-17/comparison.json`. Production/release unchanged;
+  typed state equivalence and playable synchronization remain open.
 - Resolved the logical registry lifecycle: the empty head was consumed staging
   metadata. All 24 captured registrations match three persistent lists containing
   18/1/5 nodes. Bounded real-game traces record 96 save-dispatch and 96 control-save
