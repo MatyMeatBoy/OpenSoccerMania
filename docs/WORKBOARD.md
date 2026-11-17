@@ -5,6 +5,23 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.6. See
 
 ## Continuation verification, 2026-11-17
 
+- Fixed reusable network-client lifecycle failures. A closed client's new
+  connect previously retained `disconnected`, so its hello failed with connection
+  lost. New streams now start with fresh events/timeline/identity and preserve
+  timeline capacity; separately retained credentials can still resume a valid
+  lease. Socket-level checks exchange different frame-zero inputs across two
+  rooms and verify that old input/events do not leak. Live and pending duplicate
+  connects are rejected before replacement; failed handshakes close their reader.
+- Review identified and reproduced an overlapping-close race: delayed old stream
+  shutdown cancelled mutable `self.task` after a new reader replaced it. Close
+  now captures writer/reader references before awaiting. A gated real-stream
+  test fails before correction and passes with the new reader alive and a
+  successful ping afterward. Shutdown errors also retain reader cleanup.
+  All 14 focused network cases and 133 aggregate Python tests pass (one privilege
+  skip); follow-up review finds no additional actionable issues. Logs:
+  `local/release-verification/pre6-build/client-reconnect-reviewed-*.log`.
+  See [transport lifecycle](network-transport.md). Same-room match restart and
+  actual simulation synchronization remain pending; no playable-online claim.
 - Windowed movie acceptance now includes a natural, unskipped introduction
   through resize / minimize / restore. Read-only samples confirm movie activity
   at all five window actions. Win32 receipts confirm actual minimization,

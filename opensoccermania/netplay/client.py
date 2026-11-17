@@ -14,10 +14,24 @@ class NetplayClient:
         self.identity = None
 
     async def connect(self, host="127.0.0.1", port=27845, ssl=None):
-        self.reader, self.writer = await asyncio.wait_for(asyncio.open_connection(host, port, ssl=ssl), 5)
-        self.task = asyncio.create_task(self._read())
-        await self.request("hello", version=VERSION)
-        return self
+        if getattr(self, "connecting", False) or (hasattr(self, "task") and not self.task.done()):
+            raise NetplayError("already connected")
+        self.connecting = True
+        try:
+            self.reader, self.writer = await asyncio.wait_for(asyncio.open_connection(host, port, ssl=ssl), 5)
+            self.disconnected = None
+            self.events = asyncio.Queue(maxsize=512)
+            self.timeline = InputTimeline(self.timeline.capacity)
+            self.identity = None
+            self.task = asyncio.create_task(self._read())
+            try:
+                await self.request("hello", version=VERSION)
+            except BaseException:
+                await self.close()
+                raise
+            return self
+        finally:
+            self.connecting = False
 
     async def _read(self):
         try:
@@ -68,7 +82,12 @@ class NetplayClient:
 
     async def close(self):
         if hasattr(self, "writer"):
-            self.writer.close()
-            await self.writer.wait_closed()
-            self.task.cancel()
-            await asyncio.gather(self.task, return_exceptions=True)
+            writer, reader_task = self.writer, self.task
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except ConnectionError:
+                pass
+            finally:
+                reader_task.cancel()
+                await asyncio.gather(reader_task, return_exceptions=True)

@@ -114,6 +114,125 @@ class NetworkTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises((NetplayError, ConnectionError)):
             await clients[1].request("ping")
 
+    async def test_closed_client_reconnect_starts_with_clean_session_state(self):
+        pair = [await self.client() for _ in range(2)]
+        for seat, client in enumerate(pair):
+            await client.join("first", COMPAT, team=seat)
+            await client.request("ready", ready=True)
+        first_session = (await pair[0].request("start"))["session"]
+        for client in pair:
+            await client.request("input", session=first_session, frame=0,
+                                 input={"x": 123, "y": 0, "buttons": 1})
+        await self.wait_until(lambda: all(c.timeline.complete(0, range(2)) for c in pair))
+        pair[0].timeline.capacity = 3
+        for client in pair:
+            self.assertFalse(client.events.empty())
+            capacity = client.timeline.capacity
+            await client.close()
+            await client.connect(port=self.server.port)
+            self.assertEqual(client.timeline.capacity, capacity)
+            self.assertIsNone(client.identity)
+            self.assertEqual(client.timeline.frames, {})
+            self.assertEqual(client.timeline.latest, {})
+            self.assertTrue(client.events.empty())
+        for seat, client in enumerate(pair):
+            await client.join("second", COMPAT, team=seat)
+            await client.request("ready", ready=True)
+        second_session = (await pair[0].request("start"))["session"]
+        self.assertNotEqual(second_session, first_session)
+        for client in pair:
+            await client.request("input", session=second_session, frame=0,
+                                 input={"x": -321, "y": 0, "buttons": 2})
+        await self.wait_until(lambda: all(c.timeline.complete(0, range(2)) for c in pair))
+        for client in pair:
+            self.assertEqual(client.timeline.complete(0, range(2)),
+                             {seat: {"x": -321, "y": 0, "buttons": 2} for seat in range(2)})
+
+    async def test_connect_rejects_live_client_without_replacing_connection(self):
+        client = await self.client()
+        writer, reader_task = client.writer, client.task
+        with self.assertRaisesRegex(NetplayError, "already connected"):
+            await client.connect(port=self.server.port)
+        self.assertIs(client.writer, writer)
+        self.assertIs(client.task, reader_task)
+        self.assertEqual((await client.request("ping", nonce="still-live"))["nonce"], "still-live")
+
+    async def test_connect_rejects_second_call_while_socket_is_opening(self):
+        client = NetplayClient()
+        self.clients.append(client)
+        started, release = asyncio.Event(), asyncio.Event()
+        open_connection = asyncio.open_connection
+        async def gated_open(*args, **kwargs):
+            started.set()
+            await release.wait()
+            return await open_connection(*args, **kwargs)
+        with patch("opensoccermania.netplay.client.asyncio.open_connection", new=gated_open):
+            first = asyncio.create_task(client.connect(port=self.server.port))
+            try:
+                await asyncio.wait_for(started.wait(), 1)
+                with self.assertRaisesRegex(NetplayError, "already connected"):
+                    await asyncio.wait_for(client.connect(port=self.server.port), 1)
+            finally:
+                release.set()
+                await first
+        self.assertEqual((await client.request("ping", nonce="only-one"))["nonce"], "only-one")
+
+    async def test_old_close_cannot_cancel_reconnected_reader(self):
+        client = await self.client()
+        old_writer, old_reader = client.writer, client.task
+        wait_closed = old_writer.wait_closed
+        started, release = asyncio.Event(), asyncio.Event()
+        async def gated_shutdown():
+            await wait_closed()
+            started.set()
+            await release.wait()
+        with patch.object(old_writer, "wait_closed", new=gated_shutdown):
+            closing = asyncio.create_task(client.close())
+            try:
+                await asyncio.wait_for(started.wait(), 1)
+                await self.wait_until(old_reader.done)
+                await client.connect(port=self.server.port)
+                new_reader = client.task
+                self.assertIsNot(new_reader, old_reader)
+            finally:
+                release.set()
+                await closing
+        self.assertFalse(new_reader.done())
+        self.assertEqual((await client.request("ping", nonce="new-survives"))["nonce"], "new-survives")
+
+    async def test_failed_handshake_closes_stream_and_reader(self):
+        client = NetplayClient()
+        self.clients.append(client)
+        from unittest.mock import AsyncMock
+        with patch.object(client, "request", new=AsyncMock(side_effect=NetplayError("handshake rejected"))):
+            with self.assertRaisesRegex(NetplayError, "handshake rejected"):
+                await client.connect(port=self.server.port)
+        self.assertTrue(client.writer.is_closing())
+        self.assertTrue(client.task.done())
+        await client.connect(port=self.server.port)
+        self.assertEqual((await client.request("ping", nonce="retry"))["nonce"], "retry")
+
+    async def test_reused_client_resumes_with_separately_saved_credentials(self):
+        client = await self.client()
+        await client.join("resume", COMPAT)
+        identity = client.identity.copy()
+        self.control_server_clock()
+        player = self.server.rooms["resume"].players[identity["player"]]
+        await client.close()
+        await self.wait_until(lambda: player.connection is None)
+        await client.connect(port=self.server.port)
+        self.assertIsNone(client.identity)
+        await client.resume(identity, COMPAT)
+        self.assertEqual(client.identity, identity)
+
+    async def test_close_stops_reader_after_stream_shutdown_error(self):
+        client = await self.client()
+        from unittest.mock import AsyncMock
+        with patch.object(client.writer, "wait_closed", new=AsyncMock(side_effect=ConnectionResetError)):
+            await client.close()
+        self.assertTrue(client.writer.is_closing())
+        self.assertTrue(client.task.done())
+
     async def test_resume_lease_deadline_is_exclusive(self):
         clients = await self.players()
         replacement = await self.client()
