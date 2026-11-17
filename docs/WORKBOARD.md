@@ -5,6 +5,41 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.5. See
 
 ## Continuation verification, 2026-11-17
 
+- Captured another real LOAD FAILED before any profile payload read, followed by
+  a successful retry in the same process. External trace shows load phase 1,
+  phase 2, then phase 14 with operation result 2 and status 0; expected/read bytes
+  both remain zero. The seed save hashes remain unchanged. A later harness
+  navigation error entered an empty-name prompt, then cancelled without creating
+  a file; it occurs after the failed load. Evidence:
+  `story-progress-assisted/summary.json`, `initial-load-events.json`, capture 63
+  and command 9. This excludes that later prompt as the initial failure's cause.
+- The original save worker has an independently reproduced lost-request race:
+  it snapshots command zero under a lock, unlocks, then unconditionally clears
+  the shared command under a second lock. A producer can publish in between.
+  A signature-checked, stack-neutral x86 dispatch guard now sends only an idle
+  snapshot straight to the existing yield continuation. Nonzero and invalid
+  commands retain their original dispatch. The production-DLL fixture fails
+  before correction (`save-worker-cb20lpyi`) and passes afterward; it models the
+  publication order and verifies next-pass execution exactly once, registers,
+  stack, dispatch boundaries and unsupported-code exclusion.
+- All twenty-seven integration cases pass (`gpu-0zzw5vgq`), including separate
+  signature-mismatch and unverified-executable controls. Python tests pass 125
+  with one privilege skip. Independent review found no actionable introduced
+  issues and inspected the emitted naked guard. The synthetic stop case reaches
+  the yield continuation with a stopping flag; it does not execute the complete
+  original worker exit. Real patched-process verification is ongoing. The
+  observed LOAD FAILED is compatible with this race, but busy rejection ignored
+  by callers and overlapping consumers are not yet excluded; universal load or
+  Story progression acceptance remains open. See the
+  [investigation plan](superpowers/plans/2026-11-17-save-worker-idle-race.md).
+- Three fresh patched owner-game processes now show LOAD SUCCESSFUL, read all
+  4800 payload bytes, leave save hashes unchanged and close with exit zero.
+  The synchronous save-status logger is disabled; external read-only sampling
+  and the engine's startup guard marker identify the tested path. Evidence:
+  `save-worker-load-1/` through `save-worker-load-3/` summaries in the private
+  evidence root. A fourth process also loads successfully and is exercising
+  Story. These selected real loads and process closes support the correction;
+  they do not prove all failure modes or instrument the full worker-exit body.
 - Added an asset-free retained-programmable-shader Reset case. Its own shader
   uses the fallback projection epilogue; center-color and black-margin GPU
   readback verify both drawing and aspect correction before and after two

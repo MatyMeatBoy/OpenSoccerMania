@@ -3,6 +3,7 @@
 #include "camera_lens.h"
 #include "interpolation.h"
 #include "save_metadata.h"
+#include "save_worker.h"
 #include "menu_preview.h"
 
 namespace osm {
@@ -243,6 +244,7 @@ static void start_engine_hooks(const char* directory,const char* config) {
     if(camera_zoom_index<0||camera_zoom_index>2)camera_zoom_index=0;
     if(!GetPrivateProfileIntA("Graphics","VerifiedExecutable",0,config))return;
     auto* base=reinterpret_cast<unsigned char*>(GetModuleHandleA(nullptr));
+    const bool save_worker_guard=start_save_worker_guard(base);
     const unsigned char save_status_entry[]={0xa1,0xa4,0xea,0x61,0x00,0xc3};
     const unsigned char save_status_call[]={0xe8,0xe5,0x6d,0xf3,0xff,0xb9,0x07,0x00,0x00,0x00};
     const unsigned char save_header_read[]={0x8b,0x3d,0x50,0x37,0x68,0x00};
@@ -298,6 +300,6 @@ static void start_engine_hooks(const char* directory,const char* config) {
         }
         QueryPerformanceFrequency(&report_frequency);QueryPerformanceCounter(&report_time);
     }
-    FILE* file=std::fopen(engine_log,"a");if(file){std::fprintf(file,"ENGINE_HOOKS camera_frustum=%d separate_render_wait=%d primed_history=%d target_fps=%.1f\n",camera_hooks_active,timing_hooks_active,snapshot_history_hooks_active,render_limit);std::fclose(file);}
+    FILE* file=std::fopen(engine_log,"a");if(file){std::fprintf(file,"ENGINE_HOOKS camera_frustum=%d separate_render_wait=%d primed_history=%d target_fps=%.1f save_worker_idle_guard=%d\n",camera_hooks_active,timing_hooks_active,snapshot_history_hooks_active,render_limit,save_worker_guard);std::fclose(file);}
 }
 }

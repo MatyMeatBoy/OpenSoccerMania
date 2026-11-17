@@ -40,7 +40,7 @@ def main():
     try:
         cases = ('screen_render', 'world_effects_render', 'settings_render',
                  'menu_background_render', 'title_render', 'layered_com',
-                 'layered_window', 'input_mailbox', 'device_reset', 'shader_reset', 'clear_rect', 'save_metadata_runtime', 'portable_imports')
+                 'layered_window', 'input_mailbox', 'device_reset', 'shader_reset', 'clear_rect', 'save_metadata_runtime', 'save_worker', 'portable_imports')
         for name in cases:
             directory = workspace / name
             directory.mkdir()
@@ -61,7 +61,7 @@ def main():
             (directory / 'opensoccermania.ini').write_text(
                 '[Graphics]\nOutputWidth=1920\nOutputHeight=1080\n'
                 'DisplayMode=Windowed\nExperimentalHorPlus=1\n'
-                f'VerifiedExecutable={int(name in ("world_effects_render","save_metadata_runtime"))}\n'
+                f'VerifiedExecutable={int(name in ("world_effects_render","save_metadata_runtime","save_worker"))}\n'
                 'AutoWindowAspect=0\nPerformanceHud=0\nRenderFPS=0\n'
                 'VSync=0\nSpriteSeamFix=7\nOriginalAspect=0\n'
                 '[Diagnostics]\nIsolateInstance=1\n')
@@ -82,6 +82,9 @@ def main():
                 variants += [('--adaptive',), ('--original-aspect',)]
             elif name == 'save_metadata_runtime':
                 variants += [('--unsupported',), ('--trace',)]
+            elif name == 'save_worker':
+                variants += [('--unsupported',), ('--unsupported-dispatch',),
+                             ('--unsupported-completion',), ('--unverified',)]
             elif name == 'input_mailbox':
                 variants = [(str(directory / 'dinput8.dll'),)]
             for variant in variants:
