@@ -1,0 +1,22 @@
+{
+  "files": {
+    "entry.json": {
+      "sha256": "997dd158697e8003cc26d2da9c04c7204fedcb71bd0ad6e887c156e0564089a3",
+      "bytes": 2780
+    },
+    "gameplay.png": {
+      "sha256": "7c033dbe6c6355509b877c7a0dcc65201bf7691c1bdc30adbdda5652cb993b91",
+      "bytes": 806648
+    },
+    "icon.png": {
+      "sha256": "d03e070999333ef03eed8fcbb1590d7f17f591a8d7adb36fb49540cc5dc19aa0",
+      "bytes": 46069
+    },
+    "README.md": {
+      "sha256": "aad4f053b575d74563cbef2056e022746b6305ee91ace98977ddc35bed3e49be",
+      "bytes": 2965
+    }
+  },
+  "screenshot": "unaltered actual project runtime",
+  "icon": "code-native existing brand"
+}

@@ -1,0 +1,40 @@
+{
+  "key": "soccermania",
+  "repo": "OpenSoccerMania",
+  "name": "OpenSoccerMania",
+  "game": "LEGO Soccer Mania / Football Mania",
+  "author": "MatyMeatBoy",
+  "version": "0.1.0-pre.8",
+  "origin": "pc",
+  "repository_url": "https://github.com/MatyMeatBoy/OpenSoccerMania",
+  "release_url": "https://github.com/MatyMeatBoy/OpenSoccerMania/releases/tag/v0.1.0-pre.8",
+  "asset_win": "OpenSoccerMania-*-windows-x64.zip",
+  "icon": "soccermania-icon.png",
+  "shot": "soccermania-gameplay.png",
+  "blurb": "A modern Windows launcher and compatibility bridge for LEGO Soccer Mania / Football Mania. Bring your own game files.",
+  "description": "OpenSoccerMania preserves and modernizes the original Windows edition of LEGO Soccer Mania / Football Mania. It runs the user-supplied original executable through version-checked compatibility and rendering bridges; it is not a console recompilation.\n\nThe portable launcher imports a private copy of supported game files, provides a bundled graphics backend, widescreen presentation, optional camera framing, graphics profiles and an in-game F1 panel. It supports independent controller slots and Xbox 360, PlayStation 4, Switch Pro and Steam Deck button-hint styles, with automatic detection and a manual override. Normal operation uses writable portable or per-user storage without requiring administrator rights.\n\nThis is an experimental prerelease. Complete campaign/tournament coverage, long-session timing/audio equivalence, all-map replay rendering and physical four-controller/4K/VRR/Steam Deck acceptance remain unfinished. Playable synchronized online matches, VRS and temporal AA are not implemented. No original game files are distributed.",
+  "needs": "Your own supported Windows copy of LEGO Soccer Mania / Football Mania, as an installed folder or supported disc image.",
+  "setup_steps": [
+    "Extract the complete Windows ZIP into a new folder.",
+    "Run OpenSoccerMania.exe.",
+    "Choose your own supported game folder or disc image and prepare a private copy.",
+    "Adjust graphics and controls, then start the game."
+  ],
+  "features": [
+    "Widescreen",
+    "Controller",
+    "Keyboard and mouse"
+  ],
+  "credits": "Maintained by MatyMeatBoy. Original game by Silicon Dreams / LEGO / Electronic Arts. SDL, dgVoodoo, MinHook, Pillow and the Xelu CC0 controller glyph pack retain their upstream notices.",
+  "notes": "Original PC game compatibility/mod launcher, not a static recompilation. Please classify accordingly. Screenshot is an unaltered owner-game development capture, not a promise of complete game acceptance.",
+  "quiver_kind": "tool",
+  "quiver_type": null,
+  "quiver_consoles": [
+    "pc"
+  ],
+  "ai_assistance": [
+    "code",
+    "art",
+    "text"
+  ]
+}
