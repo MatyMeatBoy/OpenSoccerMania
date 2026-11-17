@@ -5,6 +5,19 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.6. See
 
 ## Continuation verification, 2026-11-17
 
+- Windowed movie acceptance now includes a natural, unskipped introduction
+  through resize / minimize / restore. Read-only samples confirm movie activity
+  at all five window actions. Win32 receipts confirm actual minimization,
+  restoration to 1280x540, then exact 800x600 and 960x540 clients. Captures show
+  progressing movie imagery after restore, the title after natural completion,
+  LOAD SUCCESSFUL, Main Menu and responsive Quick Start assignment. Movie opens
+  and closes balance, including a two-handle interval; final active count is zero.
+  Clean close is exit zero, input desktop stays unchanged and copied save hashes
+  remain identical. Evidence:
+  `local/acceptance-2026-11-17/movie-window-postpre6/summary.json`. This accepts
+  one windowed introduction, not exclusive device loss, all cinematics, physical
+  monitor transitions or audio equivalence. CI `44169171890` and `44168400466`
+  pass the preceding stencil and reconnect-test commits.
 - Added localized stencil GPU coverage beyond both former 4:3 edges. Real 3D
   geometry writes left/right stencil footprints, then the exact inspected world
   resolve shades only those marked pixels. Unmarked center/top, producer bytes
