@@ -5,6 +5,14 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.7. See
 
 ## Continuation verification, 2026-11-17
 
+- Resolved the remaining 26 changed actor words and 19 global/team words through
+  descriptor copies, team-array references and dereferenced player contexts.
+  All 214 words sharing the allocation-like delta now have reference provenance;
+  captured descriptor/context aliases also verify. This is not a complete pointer
+  schema or stable-ID/content equivalence, and no bytes are masked. Conditional
+  writes and inline RNG remain unresolved. See [remaining references](network-initial-state.md#follow-up-remaining-reference-semantics)
+  and private `remaining-reference-provenance.json`. No production input, seeds,
+  timing or published artifact changed.
 - Traced changed actor words to constructor/cleanup/use-site reference semantics:
   13 field offsets per actor, accounting for 169 of 195 changed actor words in
   the controlled pair, are resource references or owned allocator buffers.

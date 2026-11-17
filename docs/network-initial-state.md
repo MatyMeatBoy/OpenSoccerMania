@@ -53,7 +53,8 @@ actor objects with input stride `0x368`; its helper `0x559bb0` copies the full
 `0x368`-byte object before auxiliary data. The helper explicitly dereferences
 pointer fields such as `+0x2c`, `+0x1d4` and `+0x1d8`. This supports inspecting
 field types and referents, rather than treating a raw aggregate hash as a
-cross-process logical identity. It does not establish the types of all 214 words.
+cross-process logical identity. That initial inspection alone does not establish the types of all 214 words;
+the provenance follow-ups below add the missing field-level evidence.
 
 The two remaining changed words are offsets 4 and 12 of callback `0x453200`:
 `0x40` versus `0xc0` in this pair. That callback writes its 16 bytes only when
@@ -113,9 +114,10 @@ not scalar gameplay quantities to compare as raw addresses. The captured
 of both accepted runs, matching the inspected alias assignment.
 
 The classified offsets account for 169 of the 195 changed actor words in this
-pair. Changed actor offsets `0xd0` and `0x148` still need their own provenance
-and referent identity; the three changed global-header references and sixteen
-changed team-component words also remain to be audited. This is not a complete
+pair. At that stage, changed actor offsets `0xd0` and `0x148`, the three changed
+global-header words and sixteen changed team-component words had not yet been
+audited; the next follow-up below resolves their reference semantics. Stable
+referent identities are still unverified. This is not a complete
 pointer inventory: equal/null reference fields can exist outside the changed
 set. No capture bytes are altered or masked by this classification.
 
@@ -127,3 +129,44 @@ requirements above remain open. Private static receipts are
 `local/netplay-initial-2026-11-17/actor-reference-provenance.json` and its fresh
 disassembly; selected instruction anchors and release paths are checked against
 the supported owner executable. Production code and seeds remain unchanged.
+
+## Follow-up: remaining reference semantics
+
+Fresh assignment, copy and dereference sites account for the remaining 45 words
+in the three components sharing the allocation-like delta:
+
+- Actor `+0xd0` receives a descriptor loaded through resource reference `+0x2c`
+  (`0x55a2b1..0x55a2c5`, stored at `0x55aa4d`); subsequent code treats it as an
+  address. The 104-byte copy from actor `+0x6c` to `+0xe4` at
+  `0x55b509..0x55b536` includes nested descriptor `+0x64`, copying actor
+  `+0xd0` to `+0x148`. All 13 captured actors in each accepted run have nonnull,
+  equal values at those two offsets. These account for 26 changed words.
+- Global header offsets `0x20`, `0x24`, `0x28` correspond to globals
+  `0x631e80`, `0x631e84`, `0x631e88`. Initialization derives all three from the
+  team-array base `0x631e5c`: a 168-byte record stride, with `0x631e80` set to
+  base plus 336 bytes. Both captures have `p80 == p84 + 0x150` and
+  `p84 == p88`. They are record references and an alias, not three independent
+  numeric gameplay quantities. Stable team identity must replace the addresses.
+- Team serialization copies a 100-byte header and then 412-byte player records.
+  Header `+8` is dereferenced as the player's pointer array at
+  `0x47f988..0x47f990`. The observed group boundaries are 0, 2572 and 5144,
+  with 6, 6 and 1 serialized player records. Their three changed header words
+  are exactly the `+8` array references. This is the observed layout, not a
+  general decoder or proof that all setup metadata is serialized.
+- Each player record's `+0xc0` remains in the first 256 bytes copied by
+  `0x485b50`. Code at `0x485803..0x485810` and `0x487b79..0x487b85`
+  dereferences that field as a context object. These thirteen positions account
+  for every other changed word in the team component. The thirteen context
+  references are equal and nonnull within each captured process; equality of
+  the referenced contexts across processes is not established.
+
+Together with the earlier constructor/cleanup audit, all 214 changed words in
+these three components now have reference provenance. This does not establish
+a complete reference schema: equal fields, null fields, aliases and dynamic
+referents outside the changed set still need coverage. Nor does it establish
+portable IDs, equivalent referent contents or a valid restore representation.
+No bytes are masked and no whole-state equality is accepted. The two changed
+words in the conditional 16-byte component, its uncaptured flag and the distinct
+inline RNG remain unresolved. Private receipts are
+`local/netplay-initial-2026-11-17/remaining-reference-provenance.json` and fresh
+instruction disassembly; arithmetic/alias checks also use both captured pairs.
