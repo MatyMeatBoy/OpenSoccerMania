@@ -31,6 +31,20 @@ def fixture(root):
 
 
 class ReleasePackageTests(unittest.TestCase):
+    def test_capture_conversion_source_is_allowed_but_captures_stay_private(self):
+        from tools.package_release import _validate_member
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);repo=root/'repo';repo.mkdir();fixture(repo)
+            header=repo/'native/capture_pixels.h';header.parent.mkdir();header.write_bytes(b'// Public pixel conversion source\n')
+            git(repo,'add','native/capture_pixels.h')
+            git(repo,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-qm','public conversion source')
+            result=package_release(repo,git(repo,'rev-parse','HEAD'),root/'source.zip','0.1.0-pre.5')
+            with zipfile.ZipFile(result.path) as archive:
+                self.assertEqual(archive.read('OpenSoccerMania-0.1.0-pre.5-source/native/capture_pixels.h'),header.read_bytes())
+        for name in ('native/capture_pixels.png','native/capture_private.h','tests/capture_pixels.h','docs/screenshot.png','native/osm-frame-1.png'):
+            with self.subTest(name=name),self.assertRaises(ValueError):
+                _validate_member(name,'100644')
+
     def test_committed_inventory_reproducible_and_closed(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp); repo = root / 'repo'; repo.mkdir(); revision = fixture(repo)

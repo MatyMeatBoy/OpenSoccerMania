@@ -88,7 +88,7 @@ def _validate_member(name, mode):
         raise ValueError('Unapproved runtime binary: ' + name)
     if path.suffix.lower() in DENIED_SUFFIXES and name != 'runtime/SDL3.dll' and name not in VENDOR_FILES:
         raise ValueError('Binary, game, wrapper or private artifact in source release: ' + name)
-    if ('dgvoodoo' in name.casefold() and name not in VENDOR_FILES and name != VENDOR_LICENSE) or path.name.casefold().startswith(('osm-frame-', 'capture', 'screenshot')):
+    if ('dgvoodoo' in name.casefold() and name not in VENDOR_FILES and name != VENDOR_LICENSE) or (path.name.casefold().startswith(('osm-frame-', 'capture', 'screenshot')) and name != 'native/capture_pixels.h'):
         raise ValueError('Wrapper or private capture in source release: ' + name)
 
 
