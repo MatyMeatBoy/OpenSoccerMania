@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.0-pre.6 - 2026-11-17
+
 - Prevent the verified save worker's idle path from clearing a request queued after its command snapshot. Preserve normal/invalid dispatch and require matching worker signatures; do not rewrite saves or turn errors into success.
 - Discard the cached logical projection after a successful device Reset so GetTransform reports the backend's restored state instead of the previous scene's matrix.
 - Preserve user-resized window dimensions when adaptive presentation changes its source rectangle; explicitly scale into the existing client instead of allowing backend resize feedback.

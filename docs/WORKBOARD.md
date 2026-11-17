@@ -1,10 +1,24 @@
 # OpenSoccerMania work board
 
-Updated: 2026-11-17. Current baseline: 0.1.0-pre.5. See
-[scope and limits](releases/0.1.0-pre.5.md).
+Updated: 2026-11-17. Current baseline: 0.1.0-pre.6. See
+[scope and limits](releases/0.1.0-pre.6.md).
 
 ## Continuation verification, 2026-11-17
 
+- Pre.6 rebuild passes 125 Python tests (one privilege skip), 21 named native
+  CPU checks and 27 fresh GPU/input/import runs (`gpu-s8otsfoi`). The exact
+  rebuilt bridge is used by both those runs and the frozen candidate's smoke.
+  Frozen smoke verifies version pre.6, all four pages, synthetic ISO import and
+  graphics provisioning. Normal frozen startup with actual install write denial
+  and a nonadministrator token verifies fallback storage, small/large window
+  icons and clean close; disposable ACLs are restored afterward. Evidence:
+  `local/release-verification/pre6-build/`. The rebuilt native image equals the
+  Story-accepted image after normalizing only PE timestamp/checksum metadata.
+  The unchanged pre.5 candidate is retained at
+  `build/released-pre5/OpenSoccerMania/`; its published archives/tag are preserved.
+  A fresh owner-game process using the exact rebuilt pre.6 DLL also reloads
+  Western Junction and closes cleanly with unchanged saves
+  (`pre6-build/game-reload.json`).
 - A real Story checkpoint now survives a fresh-process reload. The private game
   starts at City Park, plays through multiple goals/replays and reaches Western
   Junction without manual pitch cycling. Only SAVE0000.SAV changes; the changed

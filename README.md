@@ -27,18 +27,18 @@ OpenSoccerMania gives your own game files a new desktop launcher and an incremen
 | Launcher | English interface, rounded controls, textured football artwork and local settings. |
 | Import | Private folder imports and content-checked ISO9660/raw-sector images, with read-only mounting or bounded extraction. See [supported layouts and limits](docs/disc-import.md); real image acceptance remains open. |
 | Preservation | Private copies, executable hashes, original backups and reversible version-locked startup patches. |
-| Startup | The supported private copy reaches menus and active gameplay. An ice-field match reaches final statistics and returns to Main Menu. Post-pre.5 source also verifies a City Park → Western Junction Story checkpoint across a fresh-process reload. Broader campaign/tournament persistence and load recovery remain open. |
+| Startup | The supported private copy reaches menus and active gameplay. An ice-field match reaches final statistics and returns to Main Menu. The City Park → Western Junction Story checkpoint survives a fresh-process reload. Broader campaign/tournament persistence and load recovery remain open. |
 | Modern output | D3D8 commands translated to Direct3D 11 through the bundled dgVoodoo backend; native instrumentation confirmed 1920×1080 render targets with 4× MSAA. |
 | Window modes | Windowed by default, borderless and explicit fullscreen. Windowed startup was checked with unchanged desktop dimensions. |
 | Languages | Nine text variants and eight voice directories, including Spanish. American and English share one English voice directory; selection behavior remains under investigation. |
 
 ## Getting started
 
-**Current prerelease: 0.1.0-pre.5 — self-contained Windows portable launcher and source.**
-See [scope and verification](docs/releases/0.1.0-pre.5.md).
+**Current prerelease: 0.1.0-pre.6 — self-contained Windows portable launcher and source.**
+See [scope and verification](docs/releases/0.1.0-pre.6.md).
 
 For the portable build, download the Windows portable ZIP from
-[the release page](https://github.com/MatyMeatBoy/OpenSoccerMania/releases/tag/v0.1.0-pre.5),
+[the release page](https://github.com/MatyMeatBoy/OpenSoccerMania/releases/tag/v0.1.0-pre.6),
 extract the entire folder and run `OpenSoccerMania.exe` as a normal user.
 Keep its accompanying files. The launcher includes Python and its dependencies;
 you supply only your own valid game ISO or game folder. The graphics backend,
