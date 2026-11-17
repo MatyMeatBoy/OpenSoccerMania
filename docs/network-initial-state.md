@@ -197,3 +197,52 @@ its capture reports/verifiers and source-copy DLL; phase captures are under
 No production input, seeds or scheduler behavior changes. Investigation of the
 copied conditional fields, stable reference identities and RNG ownership remains
 necessary before initial logical equivalence can be accepted.
+
+## Follow-up: conditional-byte writer provenance
+
+The 16-byte component copies eight bytes from `0x62839c` and eight from
+`0x6283bc`. Consequently, its changed offsets 4 and 12 map to byte fields
+`0x6283a0` and `0x6283c0`, rather than two complete pointer-sized values.
+Fresh inspection of the supported executable identifies two concrete writers:
+
+- In initializer `0x452ff0`, the two saved-register pushes make
+  `[esp + 0x10]` refer to original argument 2. Instruction `0x453047` loads
+  that argument's low byte into DL; the loop at `0x453053..0x45306a` stores
+  it at `0x45305f` to both fields with stride `0x20`. The same argument is
+  used as an address earlier through EDI and `[edi + 0x30]`. This is a
+  byte derived from an address argument, not a full serialized pointer.
+- Reset `0x453280` first explicitly pushes incoming ECX, then loads DL from
+  that newly written stack slot. Its corresponding stride-`0x20` loop writes
+  the same two byte fields. Calling this an unwritten stack slot would be
+  incorrect: its machine-level source is the saved incoming register. A normal
+  C++ observer could clobber that caller-saved value before forwarding the call.
+
+A fresh controlled Friendly run (`f`) uses the same teams, map, copied profiles
+and four-pad assignments as the accepted owned-buffer pair. The private probe
+records one initializer call from `0x40e27a`; argument 2 is `0x1362cd80`.
+Both captured byte fields are `0x80`, matching its low byte. No reset call is
+observed in this run, so that reset writer has static provenance only here.
+The initializer-entry flag is not logged by this probe; the flag value of 1
+before/after all 18 serializer calls must not be retroactively assigned to it.
+The result is a runtime correlation with an identified writer, not a complete
+dynamic inventory of all writes or proof of field meaning.
+
+The first aggregate again contains 18 contiguous components, 28604 bytes,
+frame zero, seed/shared RNG 999 and six controls. Its independent inline RNG
+is 1701739931. The game closes with exit zero, unchanged input desktop and
+identical hashes for all three copied saves. The observer's separate synthetic
+contract fixture checks forwarding of entry volatile values, carry and SIMD,
+and preservation of return registers, arguments and the return value.
+
+The earlier attempt (`e`) is explicitly excluded: its reset signature guard
+rejected an incorrectly guessed instruction encoding. The corrected guard uses
+the actual bytes, including the explicit zero stack displacement. Both hooks
+install in run `f`; no production hooks, input, seeds or scheduler change.
+
+These findings narrow the provenance of the remaining two differing bytes.
+They do not prove those fields are unused, padding, portable IDs or safe to
+normalize. No bytes are masked and no initial logical equivalence is accepted.
+Private evidence is under `local/netplay-conditional-2026-11-17/`:
+`conditional-provenance.json`, `capture-f.json`, `prior-field-values.json`,
+fresh writer disassembly and the observer contract fixture. Runtime phase images
+are under `local/acceptance-2026-11-17/network-conditional-f/`.

@@ -79,6 +79,15 @@ Updated: 2026-11-17. Current published baseline: 0.1.0-pre.8. See
 
 ## Continuation verification, 2026-11-17
 
+- Identified concrete writers for the two differing conditional bytes: the
+  initializer copies the low byte of an address argument, while a reset copies
+  saved incoming ECX. A new phase-verified Friendly run captures matching
+  initializer-argument/serialized low bytes, the full 18-component first state,
+  and clean shutdown with copied saves/input desktop unchanged. The reset did
+  not execute in that run, initializer-entry flags were not logged, and logical
+  use/unusedness remains unproven. No bytes are masked. See
+  [conditional-byte provenance](network-initial-state.md#follow-up-conditional-byte-writer-provenance).
+
 - A second controlled Friendly pair captures flag 1 around all component calls:
   the 16-byte conditional serializer really copies in this pair, so its remaining
   changed words cannot simply be called padding. All 130 corresponding owned
