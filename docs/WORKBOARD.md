@@ -5,6 +5,15 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.6. See
 
 ## Continuation verification, 2026-11-17
 
+- A fresh Western Junction game now passes an observed goal/replay return
+  after resize / minimize / restore. Captures show the 1-0 goal (18), low-angle
+  replay with sky, net and effects (19), kickoff after Continue (20), and moving
+  controlled play after passing/shooting (23). Read-only UI sampling confirms
+  active gameplay after the return. Clean process close is exit zero; copied
+  save hashes and the input desktop remain unchanged. Evidence:
+  `local/acceptance-2026-11-17/replay-window-pre6/summary.json`. This accepts
+  one observed transition, not all maps or exclusion of the earlier intermittent
+  nearly black replay output; shadow/net edge coverage remains separate.
 - Windowed owner-game acceptance on Western Junction now covers two resize /
   minimize / restore cycles, first at kickoff and then during moving gameplay.
   Private desktop window receipts confirm exact 1280x540, 800x600 and 960x540
