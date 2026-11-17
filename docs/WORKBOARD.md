@@ -5,6 +5,15 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.7. See
 
 ## Continuation verification, 2026-11-17
 
+- A private completion probe records 384 complete marker/mode/common/return/save
+  sequences on one thread. All sampled calls use one dispatcher with no skipped
+  update or early return. The first iteration resets its raw tick from 1 to 0
+  before mode entry, and one mode body changes RNG after the common return.
+  The late window covers introduction/kickoff transition, not moving-play
+  determinism. Clean close, unchanged input desktop and all three save hashes
+  verify. See [completion trace](network-engine-boundary.md#bounded-completion-trace)
+  and `local/netplay-completion-2026-11-17/summary.json`. Production binaries and
+  the pre.7 release remain unchanged; complete state equivalence is still open.
 - Refined the network update boundary against freshly disassembled owner bytes:
   a clock iteration can skip both mode calls, and either dispatcher can return
   before its common update. Both complete additional work afterward; the outer

@@ -114,3 +114,44 @@ and freshly disassembled bytes of owner executable SHA-256
 Private receipts are `local/netplay-boundary-2026-11-17/mode-completion-static.json`
 and `mode-completion-fresh.asm`. This is static control-flow evidence; runtime
 frequency, cross-process state equality and a playable adapter remain unverified.
+
+## Bounded completion trace
+
+A source-copy diagnostic DLL wraps the two mode dispatchers and common update,
+and records after the existing clock marker and original snapshot save. Signature
+checks guard all three extra hooks; wrappers preserve original arguments, return
+values and Win32 last-error state around diagnostic file operations. Production
+sources and release binaries are unchanged.
+
+The real private-desktop run records 384 complete six-event sequences on one
+thread: MARKER, MODE_BEGIN, COMMON_BEGIN, COMMON_END, MODE_END, SAVE. The initial
+window contains 128 sequences and a separately enabled late window contains 256.
+All use `0x456260`; no dispatch skip or early return occurs in these samples.
+Every common call increments its seed counter once. In one initial sequence,
+the generator changes after common return and before mode return, directly
+confirming additional random-state use within the mode body. The remaining 383
+mode-end values equal common-end values; that does not exclude random work in
+other paths or elsewhere in the outer loop.
+
+The first marker reports tick 1, but mode entry reports tick 0 before the common
+call. Thus initialization can reset the engine clock inside the sampled outer
+iteration. A future adapter cannot equate this raw float with an uninterrupted
+network-session frame counter without accounting for initialization/transitions.
+All sampled saves report bank allocation size 6211; neither this size nor bank
+equality establishes a complete authoritative state checksum.
+
+The run reaches four-pad assignment, map/player introduction and first-half
+kickoff. The late window is enabled at 198.3 elapsed seconds, between the retained
+introduction capture at 194.938 seconds and kickoff capture at 205.25 seconds.
+It is therefore classified as introduction/kickoff transition, not moving-play
+determinism acceptance. The original fixed navigation schedule initially missed
+the title prompt; navigation was corrected in the same live process and those
+commands are retained. Do not interpret wall-clock schedule targets as game phases.
+
+The process closes with exit zero; the offscreen runner confirms unchanged input
+desktop, and all three copied save hashes match before/after. Private receipts:
+`local/netplay-completion-2026-11-17/summary.json`, `completion.trace`, source-copy
+DLL and analyzer; captures are under
+`local/acceptance-2026-11-17/network-completion/`. Synchronous diagnostic I/O can
+affect timing. No normal-play performance, skipped-path frequency, identical
+initial-state or synchronized-online result is accepted by this trace.
