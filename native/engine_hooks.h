@@ -2,6 +2,8 @@
 #include <cmath>
 #include "camera_lens.h"
 #include "interpolation.h"
+#include "save_metadata.h"
+#include "menu_preview.h"
 
 namespace osm {
 static bool camera_hooks_active=false,timing_hooks_active=false;
@@ -13,13 +15,42 @@ static ULONGLONG last_simulation_tick=0;
 static unsigned long long camera_calls=0,camera_position_changes=0;
 static float camera_vertical_min=100,camera_vertical_max=0;
 static void* last_camera_source=nullptr;
-static bool pause_state_verified=false;
+static bool dialog_state_verified=false;
 static bool engine_gameplay() {
-    if(pause_state_verified&&(*reinterpret_cast<const unsigned*>(0x689644)||*reinterpret_cast<const unsigned*>(0x689648)))return false;
+    // Resource-loaded flags remain set throughout a match. The dialog manager
+    // alone distinguishes an active pause/submenu from ordinary gameplay.
+    if(dialog_state_verified) {
+        const auto* manager=*reinterpret_cast<const unsigned* const*>(0x681b00);
+        if(!manager||manager[0x84/4]==0)return false;
+    }
     return timing_hooks_active&&last_simulation_tick&&GetTickCount64()-last_simulation_tick<300&&
         *reinterpret_cast<const unsigned*>(0x5b75cc)>0;
 }
 static char engine_log[MAX_PATH];
+using SaveStatus=int (__cdecl *)();
+static SaveStatus original_save_status;
+static int __cdecl save_status() {
+    const int result=original_save_status();
+    if(result!=0||reinterpret_cast<std::uintptr_t>(__builtin_return_address(0))!=0x4f9c3b)return result;
+    auto*& source=*reinterpret_cast<const char**>(0x683750);
+    std::size_t available=0;
+    if(source) {
+        MEMORY_BASIC_INFORMATION memory={};
+        if(VirtualQuery(source,&memory,sizeof(memory))&&memory.State==MEM_COMMIT&&!(memory.Protect&PAGE_GUARD)) {
+            const DWORD access=memory.Protect&0xff;
+            if(access==PAGE_READONLY||access==PAGE_READWRITE||access==PAGE_WRITECOPY||
+               access==PAGE_EXECUTE_READ||access==PAGE_EXECUTE_READWRITE||access==PAGE_EXECUTE_WRITECOPY)
+                available=std::min<std::size_t>(64,reinterpret_cast<std::uintptr_t>(memory.BaseAddress)+memory.RegionSize-reinterpret_cast<std::uintptr_t>(source));
+        }
+    }
+    static thread_local char normalized[64];
+    if(normalize_save_metadata(source,available,normalized)) {
+        source=normalized;
+        static unsigned reports=0;
+        if(reports++<32){FILE* file=std::fopen(engine_log,"a");if(file){std::fputs("SAVE_METADATA normalized empty or malformed list record; files unchanged\n",file);std::fclose(file);}}
+    }
+    return result;
+}
 static volatile float* legacy_wait_rate=nullptr;
 static volatile float* legacy_logic_rate=nullptr;
 using CameraBuild=int (__cdecl *)(void*,void*);
@@ -96,6 +127,21 @@ static unsigned long long simulation_steps=0,delta_calls=0;
 static LARGE_INTEGER report_time={},report_frequency={};
 
 static int __cdecl camera_build(void* output,void* camera) {
+    if(preview_camera_context(reinterpret_cast<std::uintptr_t>(__builtin_return_address(0)),preview_hooks_active,preview_model_depth!=0))
+        return original_camera(output,camera);
+    if(isolated_camera_probe&&camera) {
+        const auto caller=reinterpret_cast<std::uintptr_t>(__builtin_return_address(0));
+        static std::uintptr_t observed[16]={};
+        for(auto& site:observed) {
+            if(site==caller)break;
+            if(!site) {
+                site=caller;
+                FILE* file=std::fopen(engine_log,"a");
+                if(file){std::fprintf(file,"CAMERA_CONTEXT caller=%08lx fov=%d aspect=%.6f\n",static_cast<unsigned long>(caller),*reinterpret_cast<const int*>(static_cast<const unsigned char*>(camera)+0x24),*reinterpret_cast<const float*>(static_cast<const unsigned char*>(camera)+0x28));std::fclose(file);}
+                break;
+            }
+        }
+    }
     // Preserve the unmodified builder path when neither lens feature nor an
     // authorized isolated camera probe needs temporary source changes.
     const bool pitch_probe=isolated_camera_probe&&probe_camera_pitch>=-80.f&&probe_camera_pitch<=80.f;
@@ -184,14 +230,17 @@ static void start_engine_hooks(const char* directory,const char* config) {
     if(camera_zoom_index<0||camera_zoom_index>2)camera_zoom_index=0;
     if(!GetPrivateProfileIntA("Graphics","VerifiedExecutable",0,config))return;
     auto* base=reinterpret_cast<unsigned char*>(GetModuleHandleA(nullptr));
-    const unsigned char pause_open[]={0xc7,0x05,0x48,0x96,0x68,0x00,0x01,0x00,0x00,0x00};
-    const unsigned char pause_ready[]={0xc7,0x05,0x44,0x96,0x68,0x00,0x01,0x00,0x00,0x00};
-    const unsigned char pause_close[]={0xc7,0x05,0x44,0x96,0x68,0x00,0x00,0x00,0x00,0x00};
-    const unsigned char pause_closed[]={0xc7,0x05,0x48,0x96,0x68,0x00,0x00,0x00,0x00,0x00};
-    pause_state_verified=std::memcmp(base+0x12f976,pause_open,sizeof(pause_open))==0&&
-        std::memcmp(base+0x12f997,pause_ready,sizeof(pause_ready))==0&&
-        std::memcmp(base+0x12fa0d,pause_close,sizeof(pause_close))==0&&
-        std::memcmp(base+0x12fa45,pause_closed,sizeof(pause_closed))==0;
+    const unsigned char save_status_entry[]={0xa1,0xa4,0xea,0x61,0x00,0xc3};
+    const unsigned char save_status_call[]={0xe8,0xe5,0x6d,0xf3,0xff,0xb9,0x07,0x00,0x00,0x00};
+    const unsigned char save_header_read[]={0x8b,0x3d,0x50,0x37,0x68,0x00};
+    if(std::memcmp(base+0x30a20,save_status_entry,sizeof(save_status_entry))==0&&
+       std::memcmp(base+0xf9c36,save_status_call,sizeof(save_status_call))==0&&
+       std::memcmp(base+0xf9cc9,save_header_read,sizeof(save_header_read))==0)
+        MH_CreateHook(base+0x30a20,reinterpret_cast<void*>(save_status),reinterpret_cast<void**>(&original_save_status));
+    // Dialog push reads the singleton and tests its empty flag at +0x84.
+    // Only inspect this layout in the verified executable with matching code.
+    const unsigned char dialog_push[]={0xa1,0x00,0x1b,0x68,0x00,0x33,0xd2,0x56,0x39,0x90,0x84,0x00,0x00,0x00};
+    dialog_state_verified=std::memcmp(base+0xe9c30,dialog_push,sizeof(dialog_push))==0;
     const unsigned char advance_signature[]={0x56,0x8b,0x74,0x24,0x08,0x8d,0x46,0x18};
     const unsigned char pose_signature[]={0x81,0xec,0x24,0x01,0x00,0x00,0x53,0x55,0x56};
     if(GetPrivateProfileIntA("Diagnostics","TraceAnimation",0,config)&&

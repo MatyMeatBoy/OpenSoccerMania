@@ -11,7 +11,7 @@ def resources(root):
     for name in RESOURCE_PATHS:
         path = root / name
         path.parent.mkdir(parents=True, exist_ok=True)
-        if name in VENDOR_HASHES:
+        if name in VENDOR_HASHES or name.startswith('assets/branding/'):
             path.write_bytes((Path(__file__).resolve().parents[1] / name).read_bytes())
         elif name.endswith('.dll'):
             raw = bytearray(128)

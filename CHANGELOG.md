@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.0-pre.5 - 2026-11-17
+
+- Center animated menu models and their depth-clear regions in the same 4:3 UI area, preserving their original local camera. Scope the correction to verified preview callers, restore viewports after draws, and preserve world cameras and experimental gameplay zooms.
+- Guard the verified save-list metadata consumer against null, blank and unterminated results, and prevent a missing team field from scanning past NUL. Preserve valid records and save files.
+- Scale logical backbuffer clear rectangles to the physical render target, including depth/stencil clears used by animated menu previews. Preserve offscreen coordinates and avoid transforming presentation bars twice.
+- Keep private diagnostic keyboard input exclusive, including incomplete mailbox updates; ordinary input continues to preserve physical keys.
+- Detect gameplay from the verified dialog manager instead of resource-loaded flags that stay set during matches, so controller mappings can change correctly between gameplay and pause menus.
+- Redirect the game's actual `SHGetSpecialFolderPathA` save path and `RegCreateKeyExA` legacy key creation into its private profile. The earlier bridge covered different API variants and left these real calls outside private storage.
+- Capture RGB565 game backbuffers as 32-bit diagnostic BMPs; report unsupported formats and file-write failures instead of logging success without producing an image.
+- Add original shared football/brick branding for launcher windows, the portable executable and game windows in all display modes; include SVG/ICO/PNG web favicons and an Apple touch icon.
+- Launch private test processes through native Win32 STARTUPINFO.lpDesktop. Assigning an arbitrary lpDesktop attribute to Python's subprocess.STARTUPINFO did not isolate earlier test processes; a child-side regression now checks the actual desktop name.
+- Run with user-writable storage automatically: preserve writable portable `local/`, otherwise use `%LOCALAPPDATA%\OpenSoccerMania`. Keep preferences/logs/library writes outside protected install folders and report the actual log path.
+- Make newly imported private runtime/configuration copies writable when source files carry the Windows read-only attribute, preserving original bytes and attributes.
+- Restore logical backbuffer identity, render-target classification and the full logical viewport after a successful graphics-device reset. An asset-free GPU regression reproduces the previous physical-size leak and checks repeated 4:3/16:9 logical resets and presentation.
+- Add `tools/test_native.ps1 -Gpu` for fresh asset-free GPU/input integration using the pinned distributed backend and isolated desktops, with retained reports and captures.
+
 ## 0.1.0-pre.3 — 2026-11-16
 
 - Fix clean-PC imports requesting graphics files: include the pinned official dgVoodoo x86 backend and default configuration, install automatically, and remove component file dialogs.

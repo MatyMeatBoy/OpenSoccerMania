@@ -9,16 +9,20 @@ static char profile_path[MAX_PATH],legacy_ini[MAX_PATH],portable_config[MAX_PATH
 static HKEY virtual_key=reinterpret_cast<HKEY>(static_cast<ULONG_PTR>(0xf053504f));
 using OpenRegistry=LSTATUS (WINAPI *)(HKEY,LPCSTR,DWORD,REGSAM,PHKEY);
 using OpenRegistryOld=LSTATUS (WINAPI *)(HKEY,LPCSTR,PHKEY);
+using CreateRegistry=LSTATUS (WINAPI *)(HKEY,LPCSTR,DWORD,LPSTR,DWORD,REGSAM,const SECURITY_ATTRIBUTES*,PHKEY,LPDWORD);
 using QueryRegistry=LSTATUS (WINAPI *)(HKEY,LPCSTR,LPDWORD,LPDWORD,LPBYTE,LPDWORD);
 using SetRegistry=LSTATUS (WINAPI *)(HKEY,LPCSTR,DWORD,DWORD,const BYTE*,DWORD);
 using CloseRegistry=LSTATUS (WINAPI *)(HKEY);
 using FolderPath=HRESULT (WINAPI *)(HWND,int,HANDLE,DWORD,LPSTR);
+using SpecialFolderPath=BOOL (WINAPI *)(HWND,LPSTR,int,BOOL);
 static OpenRegistry original_open_registry;
 static OpenRegistryOld original_open_registry_old;
+static CreateRegistry original_create_registry;
 static QueryRegistry original_query_registry;
 static SetRegistry original_set_registry;
 static CloseRegistry original_close_registry;
 static FolderPath original_folder_path;
+static SpecialFolderPath original_special_folder_path;
 using CreateMutex=HANDLE (WINAPI *)(LPSECURITY_ATTRIBUTES,BOOL,LPCSTR);
 static CreateMutex original_create_mutex;
 static HANDLE WINAPI create_mutex(LPSECURITY_ATTRIBUTES security,BOOL owned,LPCSTR name) {
@@ -46,6 +50,16 @@ static LSTATUS WINAPI open_registry(HKEY key,LPCSTR name,DWORD options,REGSAM ac
 static LSTATUS WINAPI open_registry_old(HKEY key,LPCSTR name,PHKEY output) {
     if(legacy_name(name)){if(!selected_legacy_name(name))return ERROR_FILE_NOT_FOUND;if(!output)return ERROR_INVALID_PARAMETER;*output=virtual_key;return ERROR_SUCCESS;}
     return original_open_registry_old(key,name,output);
+}
+static LSTATUS WINAPI create_registry(HKEY key,LPCSTR name,DWORD reserved,LPSTR cls,DWORD options,REGSAM access,const SECURITY_ATTRIBUTES* security,PHKEY output,LPDWORD disposition) {
+    if(legacy_name(name)){
+        if(!selected_legacy_name(name))return ERROR_FILE_NOT_FOUND;
+        if(!output)return ERROR_INVALID_PARAMETER;
+        *output=virtual_key;
+        if(disposition)*disposition=REG_OPENED_EXISTING_KEY;
+        return ERROR_SUCCESS;
+    }
+    return original_create_registry(key,name,reserved,cls,options,access,security,output,disposition);
 }
 static LSTATUS WINAPI query_registry(HKEY key,LPCSTR name,LPDWORD reserved,LPDWORD type,LPBYTE data,LPDWORD length) {
     if(key!=virtual_key)return original_query_registry(key,name,reserved,type,data,length);
@@ -84,6 +98,13 @@ static HRESULT WINAPI folder_path(HWND window,int folder,HANDLE token,DWORD flag
     if(output&&((folder&255)==0x1a||(folder&255)==0x1c)){std::strcpy(output,profile_path);return S_OK;}
     return original_folder_path(window,folder,token,flags,output);
 }
+static BOOL WINAPI special_folder_path(HWND window,LPSTR output,int folder,BOOL create) {
+    if((folder&255)==0x1a||(folder&255)==0x1c){
+        if(!output)return FALSE;
+        std::strcpy(output,profile_path);return TRUE;
+    }
+    return original_special_folder_path(window,output,folder,create);
+}
 static void prepare_portable(const char* directory,const char* config) {
     std::snprintf(game_directory,MAX_PATH,"%s",directory);
     std::snprintf(profile_path,MAX_PATH,"%sprofile",directory);CreateDirectoryA(profile_path,nullptr);
@@ -108,10 +129,12 @@ static void early_portable_imports() {
             void* replacement=nullptr;void** original=nullptr;
             if(std::strcmp(name,"RegOpenKeyExA")==0){replacement=reinterpret_cast<void*>(open_registry);original=reinterpret_cast<void**>(&original_open_registry);}
             if(std::strcmp(name,"RegOpenKeyA")==0){replacement=reinterpret_cast<void*>(open_registry_old);original=reinterpret_cast<void**>(&original_open_registry_old);}
+            if(std::strcmp(name,"RegCreateKeyExA")==0){replacement=reinterpret_cast<void*>(create_registry);original=reinterpret_cast<void**>(&original_create_registry);}
             if(std::strcmp(name,"RegQueryValueExA")==0){replacement=reinterpret_cast<void*>(query_registry);original=reinterpret_cast<void**>(&original_query_registry);}
             if(std::strcmp(name,"RegSetValueExA")==0){replacement=reinterpret_cast<void*>(set_registry);original=reinterpret_cast<void**>(&original_set_registry);}
             if(std::strcmp(name,"RegCloseKey")==0){replacement=reinterpret_cast<void*>(close_registry);original=reinterpret_cast<void**>(&original_close_registry);}
             if(std::strcmp(name,"SHGetFolderPathA")==0){replacement=reinterpret_cast<void*>(folder_path);original=reinterpret_cast<void**>(&original_folder_path);}
+            if(std::strcmp(name,"SHGetSpecialFolderPathA")==0){replacement=reinterpret_cast<void*>(special_folder_path);original=reinterpret_cast<void**>(&original_special_folder_path);}
             if(std::strcmp(name,"CreateMutexA")==0){replacement=reinterpret_cast<void*>(create_mutex);original=reinterpret_cast<void**>(&original_create_mutex);}
             if(replacement) {
                 DWORD protect;auto slot=reinterpret_cast<void**>(&slots->u1.Function);
@@ -126,10 +149,12 @@ static void start_portable(const char* directory,const char* config) {
     prepare_portable(directory,config);
     MH_CreateHook(reinterpret_cast<void*>(RegOpenKeyExA),reinterpret_cast<void*>(open_registry),reinterpret_cast<void**>(&original_open_registry));
     MH_CreateHook(reinterpret_cast<void*>(RegOpenKeyA),reinterpret_cast<void*>(open_registry_old),reinterpret_cast<void**>(&original_open_registry_old));
+    MH_CreateHook(reinterpret_cast<void*>(RegCreateKeyExA),reinterpret_cast<void*>(create_registry),reinterpret_cast<void**>(&original_create_registry));
     MH_CreateHook(reinterpret_cast<void*>(RegQueryValueExA),reinterpret_cast<void*>(query_registry),reinterpret_cast<void**>(&original_query_registry));
     MH_CreateHook(reinterpret_cast<void*>(RegSetValueExA),reinterpret_cast<void*>(set_registry),reinterpret_cast<void**>(&original_set_registry));
     MH_CreateHook(reinterpret_cast<void*>(RegCloseKey),reinterpret_cast<void*>(close_registry),reinterpret_cast<void**>(&original_close_registry));
     HMODULE shell=LoadLibraryA("shell32.dll");
     if(shell)MH_CreateHook(reinterpret_cast<void*>(GetProcAddress(shell,"SHGetFolderPathA")),reinterpret_cast<void*>(folder_path),reinterpret_cast<void**>(&original_folder_path));
+    if(shell)MH_CreateHook(reinterpret_cast<void*>(GetProcAddress(shell,"SHGetSpecialFolderPathA")),reinterpret_cast<void*>(special_folder_path),reinterpret_cast<void**>(&original_special_folder_path));
 }
 }

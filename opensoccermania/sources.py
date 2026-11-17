@@ -187,7 +187,12 @@ def prepare(source, destination, progress=lambda message: None):
         shutil.copytree(source.data, temporary / 'Mania' / 'CD')
         for p in source.exe.parent.iterdir():
             if p.is_file() and (p.suffix.lower() in ('.exe', '.dll', '.dat', '.conf') or p.name.lower() == 'messages'):
-                shutil.copy2(p, temporary / p.name)
+                copied = temporary / p.name
+                shutil.copy2(p, copied)
+                # Disc/folder sources can carry the Windows read-only bit.
+                # Runtime configuration and bridge upgrades need writable
+                # private files, without changing source attributes or ACLs.
+                copied.chmod(copied.stat().st_mode | stat.S_IWUSR)
             elif p.is_dir() and p.name.lower() == 'messages':
                 shutil.copytree(p, temporary / p.name)
         # Re-check the executable after copying, before making the entry visible.

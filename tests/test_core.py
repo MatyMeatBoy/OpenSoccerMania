@@ -1,5 +1,7 @@
 import tempfile
 import unittest
+import os
+import stat
 from pathlib import Path
 from opensoccermania.sources import discover, prepare
 from opensoccermania.video import VideoSettings, configure_wrapper
@@ -15,6 +17,24 @@ def fixture(base):
 
 
 class SourceTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == 'nt', 'Windows read-only import regression.')
+    def test_readonly_runtime_copies_are_writable_without_changing_source(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = Path(t)
+            src = fixture(root / 'disc')
+            config = src / 'dgVoodoo.conf'
+            config.write_text('[DirectX]\nResolution=unforced\n')
+            config.chmod(stat.S_IREAD)
+            try:
+                original = config.read_bytes()
+                target = prepare(discover(src), root / 'private')
+                (target / 'dgVoodoo.conf').write_text('[DirectX]\nResolution=h:1920, v:1080\n')
+                self.assertEqual(config.read_bytes(), original)
+                self.assertTrue(config.stat().st_file_attributes & stat.FILE_ATTRIBUTE_READONLY)
+                self.assertFalse((target / 'dgVoodoo.conf').stat().st_file_attributes & stat.FILE_ATTRIBUTE_READONLY)
+            finally:
+                config.chmod(stat.S_IREAD | stat.S_IWRITE)
+
     def test_installed_disc_and_private_copy(self):
         with tempfile.TemporaryDirectory() as t:
             root = Path(t)

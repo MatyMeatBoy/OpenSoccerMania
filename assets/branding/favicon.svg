@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<title>OpenSoccerMania</title>
+<rect x="0" y="0" width="64" height="64" rx="14" fill="#102f2b"/>
+<rect x="3" y="3" width="58" height="58" rx="12" fill="#235b46"/>
+<circle cx="39" cy="25" r="20" fill="#102f2b"/>
+<circle cx="39" cy="25" r="17.5" fill="#fff7e6"/>
+<polygon points="39.000,17.500 46.133,22.682 43.408,31.068 34.592,31.068 31.867,22.682" fill="#102f2b"/>
+<polyline points="39.000,17.500 39.000,7.375" fill="none" stroke="#102f2b" stroke-width="1.5"/>
+<polyline points="46.133,22.682 55.762,19.554" fill="none" stroke="#102f2b" stroke-width="1.5"/>
+<polyline points="43.408,31.068 49.360,39.259" fill="none" stroke="#102f2b" stroke-width="1.5"/>
+<polyline points="34.592,31.068 28.640,39.259" fill="none" stroke="#102f2b" stroke-width="1.5"/>
+<polyline points="31.867,22.682 22.238,19.554" fill="none" stroke="#102f2b" stroke-width="1.5"/>
+<rect x="7" y="39" width="36" height="18" rx="4" fill="#102f2b"/>
+<rect x="9" y="39" width="32" height="15" rx="3" fill="#c88d38"/>
+<rect x="9" y="38" width="32" height="11" rx="3" fill="#efba4d"/>
+<circle cx="17" cy="37.5" r="5" fill="#c88d38"/>
+<circle cx="17" cy="36" r="4.5" fill="#ffda78"/>
+<circle cx="32" cy="37.5" r="5" fill="#c88d38"/>
+<circle cx="32" cy="36" r="4.5" fill="#ffda78"/>
+</svg>

@@ -20,6 +20,9 @@ TOP_FILES = {'.gitattributes', '.gitignore', 'CHANGELOG.md', 'LICENSE',
 TOP_DIRECTORIES = {'.github', 'assets', 'docs', 'licenses', 'native',
                    'opensoccermania', 'runtime', 'server', 'tests', 'third_party', 'tools'}
 ALLOWED_ASSETS = {'assets/backgrounds/title-extension.png', 'assets/fonts/Nunito.ttf'}
+ALLOWED_ASSETS |= {f'assets/branding/{name}' for name in
+                  ('favicon.svg', 'favicon.ico', 'icon.png', 'favicon-16.png',
+                   'favicon-32.png', 'apple-touch-icon.png')}
 DENIED_SUFFIXES = {'.exe', '.dll', '.iso', '.bin', '.cue', '.img', '.mdf', '.mds',
                    '.nrg', '.zip', '.7z', '.rar', '.ogg', '.wav', '.mp4', '.avi',
                    '.bik', '.bmp', '.log', '.sav', '.bak', '.pyc', '.pdb', '.obj',

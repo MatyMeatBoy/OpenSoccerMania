@@ -17,7 +17,7 @@ $workDir = Join-Path $projectRoot 'build\pyinstaller'
 $pythonLicense = & $Python -c "import pathlib,sys; print(pathlib.Path(sys.base_prefix)/'LICENSE.txt')"
 if (-not (Test-Path -LiteralPath $pythonLicense)) { throw 'Python runtime license is missing.' }
 & $Python -m PyInstaller --noconfirm --clean --noupx --onedir --contents-directory . --windowed `
-    --name OpenSoccerMania --distpath $distDir --workpath $workDir --specpath $workDir `
+    --name OpenSoccerMania --icon "$projectRoot\assets\branding\favicon.ico" --distpath $distDir --workpath $workDir --specpath $workDir `
     --add-data "$projectRoot\assets;assets" --add-data "$projectRoot\licenses;licenses" `
     --add-data "$projectRoot\LICENSE;." --add-data "$projectRoot\THIRD_PARTY.md;." `
     --add-data "$projectRoot\README.md;." `

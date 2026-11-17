@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/branding/icon.png" width="96" height="96" alt="OpenSoccerMania football and brick icon">
+
 # OpenSoccerMania
 
 **Small bricks. Big match energy.**
@@ -32,17 +34,25 @@ OpenSoccerMania gives your own game files a new desktop launcher and an incremen
 
 ## Getting started
 
-**Current prerelease: 0.1.0-pre.4 — self-contained Windows portable launcher and source.**
-See [scope and verification](docs/releases/0.1.0-pre.4.md).
+**Current prerelease: 0.1.0-pre.5 — self-contained Windows portable launcher and source.**
+See [scope and verification](docs/releases/0.1.0-pre.5.md).
 
 For the portable build, download the Windows portable ZIP from
-[the release page](https://github.com/MatyMeatBoy/OpenSoccerMania/releases/tag/v0.1.0-pre.4),
-extract the entire folder to a writable location, and run `OpenSoccerMania.exe`.
+[the release page](https://github.com/MatyMeatBoy/OpenSoccerMania/releases/tag/v0.1.0-pre.5),
+extract the entire folder and run `OpenSoccerMania.exe` as a normal user.
 Keep its accompanying files. The launcher includes Python and its dependencies;
 you supply only your own valid game ISO or game folder. The graphics backend,
 default configuration and supported ISO reader are included; no separate
 dgVoodoo or 7-Zip installation is needed. This build targets
 Windows x64; the original game and compatibility bridges remain x86.
+
+Administrator permission is not required. A writable portable folder keeps data
+in `local/` beside the launcher. If that location is protected, the launcher uses
+`%LOCALAPPDATA%\OpenSoccerMania` for its library, preferences and logs. Game
+profiles and legacy registry settings stay inside the private game copy; no
+machine-wide installation or registry write is needed. The Compatibility page
+opens the active data/log folders. An existing library in a protected location
+is preserved; import your owned source into the writable library to use it there.
 
 For development from source:
 
@@ -64,7 +74,7 @@ powershell -ExecutionPolicy Bypass -File tools/build_native.ps1 -Toolchain "path
 Then run `.venv\Scripts\python -m opensoccermania.launcher`. Python 3.11 with Tkinter, Pillow, Windows 10/11 and LLVM-MinGW are required. MinHook is vendored; SDL3 is included with its license.
 
 Choose **a folder** containing an extracted disc or installed game, or choose
-**a disc image**. The launcher imports into `local/library/`; your source remains
+**a disc image**. The launcher imports into the active data folder's `library/`; your source remains
 unchanged. Image support is detected from content, including bounded single-track
 raw layouts and restricted CUE files. Supported images use the included ISO9660/Joliet
 reader. Damaged or zero-filled executables require a
@@ -79,7 +89,7 @@ or separate download is part of the normal import flow.
 
 ## Graphics
 
-- Configurable internal rendering up to 3840 × 2160 and ultrawide formats. 1920×1080 target allocation has been observed; 4K still needs hardware acceptance. Original low-resolution cinematics retain their source detail.
+- Configurable internal rendering up to 3840 x 2160 and ultrawide formats. Both 1920x1080 and 3840x2160 target allocation have been observed. Live 4K presentation and hardware acceptance remain pending. Original low-resolution cinematics retain their source detail.
 - Display requests through 240 Hz. A display refresh request is not a claim of 240 independent gameplay frames per second.
 - MSAA through 16× when supported by the GPU, and up to 16× anisotropic filtering.
 - Windowed, borderless and exclusive fullscreen presentation. F11 / Alt+Enter toggle Windowed and Borderless while preserving the internal render resolution.
@@ -97,9 +107,11 @@ VRR, FreeSync and G-SYNC depend on monitor/driver configuration. Activation has 
 ```powershell
 .venv\Scripts\python -m unittest discover -s tests -v
 .\tools\test_native.ps1 -Toolchain "path\to\llvm-mingw"
+# Also run asset-free GPU and native input integration on isolated desktops:
+.\tools\test_native.ps1 -Toolchain "path\to\llvm-mingw" -Gpu
 ```
 
-These commands run fixture-based Python and native checks without opening the game. Window verification tools start game windows; use the isolated-desktop harness when tests must not interrupt the desktop. Local evidence and game assets stay outside source control.
+These commands run fixture-based Python and native checks without opening the game. `-Gpu` requires built native DLLs and uses the pinned bundled backend, fresh synthetic fixtures and isolated Win32 desktops; it never switches the input desktop. Reports and captures remain under `build/tests/gpu-*/`. The optional `-Python` argument selects the Python interpreter (the project virtual environment is the default). Window verification tools start game windows; use the isolated-desktop harness when tests must not interrupt the desktop. Local evidence and game assets stay outside source control.
 
 To build the portable launcher, install `PyInstaller==6.22.3` in the build
 environment and run `tools/build_launcher.ps1` with the LLVM-MinGW path. Its
@@ -113,12 +125,13 @@ Native code lives in `native/`; import, guarded patching, configuration and the 
 
 ## Current limits
 
-The adaptive HUD, per-video scaling, modern controller bridge, performance overlay and high-FPS/simulation comparison are active work. Physical controller compatibility, real ISO import, full-match timing, 4K target allocation and hardware VRR acceptance must be checked before a release claims support.
+The native HUD/settings, controller bridge and graphics corrections have automated and selected owner-game checks. Physical four-controller compatibility, broad disc-image intake, full-match timer/audio equivalence, live 4K presentation and hardware VRR acceptance remain pending. See the release notes and work board for the exact verified cases.
 
-Some character animations and goalkeeper motion were reported to look too fast or jittery at high render rates. Development after pre.1 corrects an identified interpolation-boundary rewind; see [animation evidence](docs/animation-interpolation.md) and the unreleased changelog. Full animation equivalence and locked 240-FPS gameplay remain unverified. Some replay cameras still show a black sky/horizon band. Development tests use an isolated Win32 desktop with muted test-process audio and private input, without activating windows on the user's desktop.
+Some character animations and goalkeeper motion were reported to look too fast or jittery at high render rates. Smooth Mode remains disabled after visual regressions; first-snapshot camera initialization stays active independently. Full animation equivalence and locked 240-FPS gameplay remain unverified. An earlier nearly black replay exit is still open; a later completed match did not reproduce it. Development tests now verify the actual private Win32 desktop, with muted test-process audio and private input, without activating the user desktop. Earlier background-only probes have the limitations documented in the work board.
 
 ## Credits
 
+- Original OpenSoccerMania icon/favicons are in `assets/branding/`; regenerate them with `tools/build_icons.py`. The same multi-size icon is embedded in the launcher and native game window without changing original game resources.
 - Launcher styling adapted from the owner's [NewSnapRecomp](https://github.com/MatyMeatBoy/NewSnapRecomp), with its MIT notice retained in `licenses/`.
 - [dgVoodoo2](https://github.com/dege-diosg/dgVoodoo2) by Dege supplies the legacy DirectX translation used by the owner's game copy.
 - Nunito is distributed under the SIL Open Font License in `licenses/Nunito-OFL.txt`.

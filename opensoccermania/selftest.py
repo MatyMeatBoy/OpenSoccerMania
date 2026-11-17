@@ -15,6 +15,7 @@ VENDOR_HASHES = {
     'runtime/graphics/dgVoodoo/manifest.json': '44e4899cf4baf6d975f1f1e80ccf5c2914c97c1870082fd1dcf9c362f3396a56',
 }
 RESOURCE_PATHS = ('assets/fonts/Nunito.ttf', 'assets/backgrounds/title-extension.png',
+                  'assets/branding/favicon.ico', 'assets/branding/icon.png',
                   'runtime/SDL3.dll', 'native/d3d8.dll', 'native/dinput8.dll', *VENDOR_HASHES, 'licenses/dgVoodoo.txt')
 
 
@@ -41,6 +42,11 @@ def validate_resources(root):
     manifest = json.loads((root / 'runtime/graphics/dgVoodoo/manifest.json').read_text(encoding='utf-8'))
     if manifest.get('version') != '2.87.6' or manifest.get('files') != {Path(name).name: digest for name, digest in VENDOR_HASHES.items() if not name.endswith('.json')}:
         raise ValueError('Invalid bundled graphics vendor manifest.')
+    with Image.open(root / 'assets/branding/favicon.ico') as icon:
+        if not {(16,16),(32,32),(48,48),(256,256)}.issubset(icon.ico.sizes()):
+            raise ValueError('Application icon is missing required sizes.')
+    with Image.open(root / 'assets/branding/icon.png') as icon:
+        icon.verify()
     with Image.open(root / 'assets/backgrounds/title-extension.png') as image:
         image.verify()
     if not (root / 'assets/fonts/Nunito.ttf').read_bytes().startswith(b'\x00\x01\x00\x00'):

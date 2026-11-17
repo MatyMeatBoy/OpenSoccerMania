@@ -7,11 +7,14 @@ class PrivateKeyboard {
     const unsigned char* memory_=nullptr;
     ULONGLONG retry_=0;
     bool down_[256]={};
+    mutable bool diagnostic_=false;
 public:
     bool background_test_enabled()const {
         if(!memory_)return false;
         const auto* words=reinterpret_cast<const volatile DWORD*>(memory_);
-        return words[0]==0x494d534f&&!(words[1]&1)&&(words[2]&3)==3;
+        const DWORD sequence=words[1],flags=words[2];MemoryBarrier();
+        if(words[0]==0x494d534f&&!(sequence&1)&&words[1]==sequence)diagnostic_=(flags&3)==3;
+        return diagnostic_;
     }
     bool controller_present()const {
         if(!memory_)return false;
@@ -36,6 +39,7 @@ public:
             if(mapping_&&!memory_){CloseHandle(mapping_);mapping_=nullptr;}
         }
         bool pressed=false;
+        background_test_enabled(); // Latch ownership even while no private key is down.
         if(memory_) {
             const auto* words=reinterpret_cast<const volatile DWORD*>(memory_);
             const DWORD sequence=words[1],flags=words[2];

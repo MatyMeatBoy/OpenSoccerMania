@@ -27,6 +27,17 @@ int main() {
     table[2]=reinterpret_cast<void*>(layered_release);VirtualProtect(table+2,sizeof(void*),protection,&protection);
     check(SUCCEEDED(api->CreateDevice(0,D3DDEVTYPE_HAL,window,D3DCREATE_HARDWARE_VERTEXPROCESSING,&params,&second)),"Create second device with layered COM slot");
     check(!recursed,"Device creation must not replace its original with a forwarding shim");
+    // dgVoodoo 2.87.6 rebuilds its shared table during CreateDevice; older
+    // versions preserve the shim. In either case the bridge must still be the
+    // downstream target. Restore only the exact known shim if it was reset.
+    const auto layer=[&](IDirect3DDevice8* device) {
+        auto** current=*reinterpret_cast<void***>(device);
+        if(current[2]==reinterpret_cast<void*>(layered_release))return;
+        check(current[2]==reinterpret_cast<void*>(next_release),"Backend table reset must retain bridge Release");
+        DWORD previous=0;check(VirtualProtect(current+2,sizeof(void*),PAGE_READWRITE,&previous)!=FALSE,"Restore Release layer after backend table reset");
+        current[2]=reinterpret_cast<void*>(layered_release);VirtualProtect(current+2,sizeof(void*),previous,&previous);
+    };
+    layer(first);layer(second);
     const ULONG second_refs=second->Release();check(!recursed,"Layered Release must not recurse");check(second_refs==0,"Second device releases completely");
     const ULONG first_refs=first->Release();check(!recursed&&first_refs==0,"First device releases completely through shim");
     check(calls>0,"Compatibility shim remains in call chain");api->Release();DestroyWindow(window);

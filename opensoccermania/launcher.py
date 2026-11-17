@@ -20,6 +20,7 @@ from .backends import ensure_backend, install_backend
 from .title_assets import load_title_image,TitleAssetError
 from .diagnostics import logger, Session
 from .controllers import ControllerBridge, MATCH, KEYS, RAW_XBOX
+from .storage import select_home
 
 ROOT = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent.parent
 HOME = ROOT / 'local'
@@ -70,7 +71,7 @@ class Launcher:
         self.log=logger(HOME)
         def callback_error(kind,value,traceback):
             self.log.error('Unhandled launcher callback',exc_info=(kind,value,traceback))
-            messagebox.showerror('OpenSoccerMania error',f'{value}\n\nDetails were saved to local/logs/launcher.log.')
+            messagebox.showerror('OpenSoccerMania error',f'{value}\n\nDetails were saved to {HOME / "logs/launcher.log"}.')
         root.report_callback_exception=callback_error
         self.entry = None
         self.images=[]
@@ -80,6 +81,12 @@ class Launcher:
         except (OSError, ValueError):
             self.prefs={}
         root.title('OpenSoccerMania')
+        icon=ROOT/'assets/branding/favicon.ico'
+        if icon.is_file() and os.name=='nt':
+            try:
+                root.iconbitmap(str(icon))
+                root.iconbitmap(default=str(icon))
+            except tk.TclError:self.log.warning('Could not load the application icon',exc_info=True)
         root.geometry('1180x820')
         root.minsize(1020,760)
         root.configure(bg=CREAM)
@@ -527,10 +534,19 @@ class Launcher:
 
 
 def main():
+    global HOME
     if len(sys.argv)==3 and sys.argv[1]=='--smoke-test-report':
         from .selftest import run
         raise SystemExit(run(sys.argv[2]))
-    root=tk.Tk();Launcher(root);root.mainloop()
+    root=tk.Tk()
+    try:
+        HOME=select_home(ROOT)
+    except OSError as error:
+        root.withdraw()
+        messagebox.showerror('Could not prepare user storage',str(error))
+        root.destroy()
+        return
+    Launcher(root);root.mainloop()
 
 
 if __name__=='__main__':main()

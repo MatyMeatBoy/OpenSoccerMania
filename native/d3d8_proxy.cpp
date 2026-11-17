@@ -13,6 +13,7 @@
 #include "hook_chain.h"
 #include "input_page.h"
 #include "cursor_mode.h"
+#include "capture_pixels.h"
 #include "aspect.h"
 #include "layout.h"
 #include "screen_vertices.h"
@@ -21,6 +22,7 @@
 #include "../third_party/minhook/include/MinHook.h"
 #include "movies.h"
 #include "portable.h"
+#include "menu_preview.h"
 #include "engine_hooks.h"
 #include "title_background.h"
 #include "menu_background.h"
@@ -106,6 +108,27 @@ using SetViewportFn=HRESULT (WINAPI *)(IDirect3DDevice8*,const D3DVIEWPORT8*);
 using GetViewportFn=HRESULT (WINAPI *)(IDirect3DDevice8*,D3DVIEWPORT8*);
 static SetViewportFn original_set_viewport;
 static GetViewportFn original_get_viewport;
+using ClearFn=HRESULT (WINAPI *)(IDirect3DDevice8*,DWORD,const D3DRECT*,DWORD,D3DCOLOR,float,DWORD);
+static ClearFn original_clear;
+static HRESULT WINAPI clear_rects(IDirect3DDevice8* device,DWORD count,const D3DRECT* rects,DWORD flags,D3DCOLOR color,float depth,DWORD stencil) {
+    if(!count||!rects||osm::title_background_drawing||!on_backbuffer(device))
+        return original_clear(device,count,rects,flags,color,depth,stencil);
+    std::vector<D3DRECT> physical;
+    if(count>physical.max_size())return D3DERR_INVALIDCALL;
+    try {physical.resize(count);}catch(const std::bad_alloc&){return E_OUTOFMEMORY;}
+    for(DWORD i=0;i<count;++i) {
+        const auto coordinate=[](double value,float scale,float offset,bool end) {
+            const double mapped=static_cast<double>(value)*scale+offset;
+            return static_cast<LONG>(std::clamp(end?std::ceil(mapped):std::floor(mapped),-2147483648.,2147483647.));
+        };
+        const bool preview=wide&&osm::preview_clear_depth;
+        const auto x=[&](LONG value){return preview?osm::preview_axis(value,logical_width*.5,scale):double(value);};
+        const auto y=[&](LONG value){return preview?osm::preview_axis(value,logical_height*.5,vertical_scale):double(value);};
+        physical[i]={coordinate(x(rects[i].x1),raster_x,raster_offset_x,false),coordinate(y(rects[i].y1),raster_y,raster_offset_y,false),
+                     coordinate(x(rects[i].x2),raster_x,raster_offset_x,true),coordinate(y(rects[i].y2),raster_y,raster_offset_y,true)};
+    }
+    return original_clear(device,count,physical.data(),flags,color,depth,stencil);
+}
 static HRESULT WINAPI set_viewport(IDirect3DDevice8* device,const D3DVIEWPORT8* viewport) {
     if(osm::title_background_drawing)return original_set_viewport(device,viewport);
     if(!viewport)return original_set_viewport(device,viewport);
@@ -164,17 +187,25 @@ static void capture_backbuffer(IDirect3DDevice8* device,const char* tag="frame")
     D3DLOCKED_RECT locked;
     if(SUCCEEDED(status))status=IDirect3DSurface8_LockRect(copy,&locked,nullptr,D3DLOCK_READONLY);
     if(SUCCEEDED(status)) {
-        if(desc.Format==D3DFMT_X8R8G8B8 || desc.Format==D3DFMT_A8R8G8B8) {
+        if(desc.Format==D3DFMT_X8R8G8B8 || desc.Format==D3DFMT_A8R8G8B8 || desc.Format==D3DFMT_R5G6B5) {
             char path[MAX_PATH];std::snprintf(path,MAX_PATH,"%sosm-%s-%lu.bmp",directory,tag,presents);
             FILE* file=std::fopen(path,"wb");
             if(file){BITMAPFILEHEADER header={};BITMAPINFOHEADER info={};
                 header.bfType=0x4d42;header.bfOffBits=sizeof(header)+sizeof(info);header.bfSize=header.bfOffBits+desc.Width*desc.Height*4;
                 info.biSize=sizeof(info);info.biWidth=desc.Width;info.biHeight=-static_cast<LONG>(desc.Height);info.biPlanes=1;info.biBitCount=32;info.biCompression=BI_RGB;
                 std::fwrite(&header,1,sizeof(header),file);std::fwrite(&info,1,sizeof(info),file);
-                for(UINT y=0;y<desc.Height;++y)std::fwrite(static_cast<const char*>(locked.pBits)+y*locked.Pitch,4,desc.Width,file);
-                std::fclose(file);
-            }
-        }
+                std::vector<DWORD> converted(desc.Width);
+                for(UINT y=0;y<desc.Height;++y){
+                    const auto* row=static_cast<const BYTE*>(locked.pBits)+y*locked.Pitch;
+                    if(desc.Format==D3DFMT_R5G6B5){
+                        for(UINT x=0;x<desc.Width;++x)converted[x]=osm::capture_rgb565(reinterpret_cast<const WORD*>(row)[x]);
+                        std::fwrite(converted.data(),4,desc.Width,file);
+                    }else std::fwrite(row,4,desc.Width,file);
+                }
+                if(std::ferror(file))status=E_FAIL;
+                if(std::fclose(file))status=E_FAIL;
+            }else status=E_FAIL;
+        }else status=D3DERR_NOTAVAILABLE;
         IDirect3DSurface8_UnlockRect(copy);
     }
     if(copy)IDirect3DSurface8_Release(copy);if(source)IDirect3DSurface8_Release(source);
@@ -252,14 +283,14 @@ static SHORT WINAPI async_key(int key) {
     if(settings_menu.is_open())return 0;
     const bool focused=game_window&&GetForegroundWindow()==game_window;
     const SHORT injected=private_keyboard.state(key,focused,osm::movie_files.load()!=0);
-    if(injected)return injected;
+    if(injected||private_keyboard.background_test_enabled())return injected;
     if(game_window && !focused)return 0;
     return original_async_key(key);
 }
 static SHORT settings_key(int key) {
     const bool focused=game_window&&GetForegroundWindow()==game_window;
     const SHORT injected=private_keyboard.state(key,focused,osm::movie_files.load()!=0);
-    return injected?injected:focused&&original_async_key?original_async_key(key):0;
+    return injected||private_keyboard.background_test_enabled()?injected:focused&&original_async_key?original_async_key(key):0;
 }
 static int (WINAPI *original_message_box)(HWND,LPCSTR,LPCSTR,UINT)=nullptr;
 static int WINAPI message_box(HWND window,LPCSTR text,LPCSTR title,UINT flags) {
@@ -423,6 +454,14 @@ static void install_window_hooks(HWND window) {
     FILE* file=std::fopen(log_path,"a");if(file){std::fprintf(file,"WINDOW class_proc=%p resize_owner=backend legacy_hook=%d downstream=%p\n",procedure,original_legacy_proc!=nullptr,reinterpret_cast<void*>(previous));std::fclose(file);}
 }
 static void window_appearance(HWND window) {
+    if(window){
+        // Original project artwork embedded in our bridge; no game PE or
+        // registry changes are needed for taskbar/titlebar/Alt-Tab branding.
+        HICON small=static_cast<HICON>(LoadImageW(self_module,MAKEINTRESOURCEW(101),IMAGE_ICON,GetSystemMetrics(SM_CXSMICON),GetSystemMetrics(SM_CYSMICON),LR_SHARED));
+        HICON large=static_cast<HICON>(LoadImageW(self_module,MAKEINTRESOURCEW(101),IMAGE_ICON,GetSystemMetrics(SM_CXICON),GetSystemMetrics(SM_CYICON),LR_SHARED));
+        if(small)SendMessageW(window,WM_SETICON,ICON_SMALL,reinterpret_cast<LPARAM>(small));
+        if(large)SendMessageW(window,WM_SETICON,ICON_BIG,reinterpret_cast<LPARAM>(large));
+    }
     if(display_mode==2 || !window)return;
     MONITORINFO monitor={};monitor.cbSize=sizeof(monitor);
     if(!GetMonitorInfoA(MonitorFromWindow(window,MONITOR_DEFAULTTONEAREST),&monitor))return;
@@ -468,18 +507,28 @@ static void toggle_borderless(HWND window) {
 }
 
 static HRESULT WINAPI reset(IDirect3DDevice8* device,D3DPRESENT_PARAMETERS* params) {
+    if(!params)return D3DERR_INVALIDCALL;
     osm::menu_background.release();
     osm::title_background.release();osm::reset_title_frame();
     invalidate_state_cache();
     performance_hud.release(device);
     settings_menu.release(device);
     physical_backbuffer=nullptr;
-    if(!params)return D3DERR_INVALIDCALL;
     install_window_hooks(params->hDeviceWindow?params->hDeviceWindow:game_window);
     D3DPRESENT_PARAMETERS physical=*params;window_parameters(&physical);render_parameters(physical,*params);
     const HRESULT result=real_reset(device,&physical);
     FILE* file=std::fopen(log_path,"a");if(file){std::fprintf(file,"RESET result=0x%lx size=%ux%u windowed=%d\n",static_cast<unsigned long>(result),physical.BackBufferWidth,physical.BackBufferHeight,physical.Windowed);std::fclose(file);}
-    if(SUCCEEDED(result)){osm::menu_background.set_device(device);osm::title_background.set_device(device);window_appearance(params->hDeviceWindow);}
+    if(SUCCEEDED(result)){
+        // Reset replaces the default render target. Reestablish the same
+        // logical/physical mapping used at CreateDevice before game queries
+        // or screen-space draws can observe the new surface.
+        target_is_backbuffer=true;
+        IDirect3DSurface8* back=nullptr;
+        if(SUCCEEDED(backbuffer(device,0,D3DBACKBUFFER_TYPE_MONO,&back))&&back)IDirect3DSurface8_Release(back);
+        D3DVIEWPORT8 viewport={0,0,logical_width,logical_height,0,1};set_viewport(device,&viewport);
+        osm::menu_background.set_device(device);osm::title_background.set_device(device);
+        window_appearance(params->hDeviceWindow?params->hDeviceWindow:game_window);
+    }
     return result;
 }
 static unsigned constant_calls=0;
@@ -496,6 +545,23 @@ struct DrawAdjustment {
     explicit DrawAdjustment(IDirect3DDevice8* value,bool flat_screen=false,bool background_layer=false):prompt_texture(value),device(value) {
         if(!wide&&!osm::movie_files.load()&&!sprite_fix_mode&&!background_layer)return;
         if(!on_backbuffer(device))return;
+        DWORD preview_shader=0;
+        if(wide&&osm::preview_model_depth&&!osm::movie_files.load()&&SUCCEEDED(current_shader(device,&preview_shader))&&
+           osm::preview_viewport_needed(preview_shader,programmable_shaders.count(preview_shader)!=0,clip_shaders.count(preview_shader)!=0)&&
+           SUCCEEDED(original_get_viewport(device,&viewport))) {
+            const auto centered=osm::preview_viewport(viewport,raster_offset_x+logical_width*raster_x*.5,
+                raster_offset_y+logical_height*raster_y*.5,scale,vertical_scale);
+            viewport_changed=SUCCEEDED(original_set_viewport(device,&centered));
+            if(osm::isolated_camera_probe) {
+                const DWORD shader=preview_shader;
+                static DWORD seen[16]={};static unsigned seen_count=0;
+                bool known=false;for(unsigned i=0;i<seen_count;++i)known|=seen[i]==shader;
+                if(!known&&seen_count<16) {
+                    seen[seen_count++]=shader;
+                    FILE* file=std::fopen(log_path,"a");if(file){std::fprintf(file,"MENU_PREVIEW_DRAW shader=%lu programmable=%d clip=%d flat=%d old_view=%lu,%lu,%lu,%lu new_view=%lu,%lu,%lu,%lu applied=%d\n",shader,int(programmable_shaders.count(shader)!=0),int(clip_shaders.count(shader)!=0),int(flat_screen),viewport.X,viewport.Y,viewport.Width,viewport.Height,centered.X,centered.Y,centered.Width,centered.Height,int(viewport_changed));std::fclose(file);}
+                }
+            }
+        }
         if(background_layer&&SUCCEEDED(IDirect3DDevice8_GetRenderState(device,D3DRS_FOGENABLE,&fog))&&fog)
             fog_changed=SUCCEEDED(IDirect3DDevice8_SetRenderState(device,D3DRS_FOGENABLE,FALSE));
         if(osm::movie_files.load()) {
@@ -968,7 +1034,7 @@ static HRESULT WINAPI present(IDirect3DDevice8* device,const RECT* source,const 
     if(content.Y)bars[bar_count++]={0,0,static_cast<LONG>(requested_width),static_cast<LONG>(content.Y)};
     if(content.X+content.Width<requested_width)bars[bar_count++]={static_cast<LONG>(content.X+content.Width),0,static_cast<LONG>(requested_width),static_cast<LONG>(requested_height)};
     if(content.Y+content.Height<requested_height)bars[bar_count++]={0,static_cast<LONG>(content.Y+content.Height),static_cast<LONG>(requested_width),static_cast<LONG>(requested_height)};
-    if(bar_count)IDirect3DDevice8_Clear(device,bar_count,bars,D3DCLEAR_TARGET,0xff000000,1,0);
+    if(bar_count)original_clear(device,bar_count,bars,D3DCLEAR_TARGET,0xff000000,1,0);
     if(SUCCEEDED(IDirect3DDevice8_BeginScene(device))) {
         performance_hud.draw(device,overlay_draw);
         RECT client={};GetClientRect(game_window,&client);
@@ -1041,6 +1107,7 @@ static HRESULT WINAPI create_device(IDirect3D8* api,UINT adapter,D3DDEVTYPE type
         hook(&table->GetTransform,get_transform,real_get_transform);
         hook(&table->SetViewport,set_viewport,original_set_viewport);
         hook(&table->GetViewport,get_viewport,original_get_viewport);
+        hook(&table->Clear,clear_rects,original_clear);
         hook(&table->Present,present,real_present);
         hook(&table->DrawPrimitiveUP,draw_up,real_draw_up);
         hook(&table->DrawIndexedPrimitiveUP,draw_indexed_up,real_draw_indexed_up);
@@ -1091,6 +1158,7 @@ extern "C" IDirect3D8* WINAPI Direct3DCreate8(UINT sdk_version) {
             osm::start_movies(directory);
             osm::start_portable(directory,config_path);
             osm::start_engine_hooks(directory,config_path);
+            osm::start_preview_hooks(config_path,log_path,osm::camera_hooks_active);
             osm::start_edition_hooks(config_path,log_path);
             osm::start_title_hooks(config_path,log_path);
             osm::menu_background.start(config_path,log_path,{[](){return target_is_backbuffer;},[](){return wide?scale:1.f;},draw_up});

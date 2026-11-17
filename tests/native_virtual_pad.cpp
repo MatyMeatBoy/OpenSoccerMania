@@ -90,7 +90,7 @@ int main(int argc,char** argv){
     char name[96];std::snprintf(name,sizeof(name),"Local\\OpenSoccerMania-Input-%lu",GetCurrentProcessId());
     HANDLE mapping=CreateFileMappingA(INVALID_HANDLE_VALUE,nullptr,PAGE_READWRITE,0,272,name);auto* input=static_cast<BYTE*>(MapViewOfFile(mapping,FILE_MAP_WRITE,0,0,272));std::memset(input,0,272);auto* words=reinterpret_cast<DWORD*>(input);words[0]=0x494d534f;words[1]=2;words[2]=5;input[16+DIK_UP]=0x80;
     original_state=physical_keyboard;BYTE keys[256]={};assert(device_state(nullptr,256,keys)==DI_OK);assert(keys[DIK_W]==0x80&&keys[DIK_UP]==0);
-    words[2]=3;words[1]+=2;assert(device_state(nullptr,256,keys)==DI_OK);assert(keys[DIK_W]==0x80&&keys[DIK_UP]==0x80);
+    words[2]=3;words[1]+=2;assert(device_state(nullptr,256,keys)==DI_OK);assert(keys[DIK_W]==0&&keys[DIK_UP]==0x80); // Private diagnostics replace physical input.
     // Skip commands may touch only Escape, only during a cinematic.
     game_window=GetForegroundWindow();words[2]=17;words[1]+=2;input[16+DIK_ESCAPE]=0x80;
     ui.publish(false,false,true);

@@ -14,9 +14,9 @@ import re
 import tempfile
 import zipfile
 try:
-    from .package_release import PackageResult, _git, _safe_output, VENDOR_FILES, VENDOR_LICENSE, validate_vendor_file
+    from .package_release import PackageResult, _git, _safe_output, VENDOR_FILES, VENDOR_LICENSE, validate_vendor_file, ALLOWED_ASSETS
 except ImportError:
-    from package_release import PackageResult, _git, _safe_output, VENDOR_FILES, VENDOR_LICENSE, validate_vendor_file
+    from package_release import PackageResult, _git, _safe_output, VENDOR_FILES, VENDOR_LICENSE, validate_vendor_file, ALLOWED_ASSETS
 
 REQUIRED_FILES = {
     'OpenSoccerMania.exe', 'assets/backgrounds/title-extension.png',
@@ -27,6 +27,7 @@ REQUIRED_FILES = {
     'licenses/Python/LICENSE.txt',
 }
 REQUIRED_FILES |= set(VENDOR_FILES) | {VENDOR_LICENSE}
+REQUIRED_FILES |= ALLOWED_ASSETS
 VENDOR_DIRECTORIES = {'runtime/graphics', 'runtime/graphics/dgVoodoo'}
 
 MAX_FILES = 20000
@@ -68,7 +69,7 @@ def _member(name):
         raise ValueError('Private game file in portable input: ' + name)
     if len(parts)>1 and parts[0] not in PUBLIC_DIRECTORIES and not re.fullmatch(r'(?:pillow|pyinstaller)-[0-9.]+\.dist-info',parts[0]):
         raise ValueError('Unapproved portable dependency directory: ' + name)
-    if parts[0] == 'assets' and name not in {'assets', 'assets/backgrounds', 'assets/fonts', 'assets/backgrounds/title-extension.png', 'assets/fonts/Nunito.ttf'}:
+    if parts[0] == 'assets' and name not in {'assets', 'assets/backgrounds', 'assets/fonts', 'assets/branding'} | ALLOWED_ASSETS:
         raise ValueError('Unapproved redistributable asset: ' + name)
     if parts[0] == 'native' and name not in {'native', 'native/d3d8.dll', 'native/dinput8.dll'}:
         raise ValueError('Unapproved project-native binary: ' + name)

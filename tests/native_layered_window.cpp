@@ -25,6 +25,7 @@ int main() {
     D3DPRESENT_PARAMETERS params={};params.BackBufferWidth=640;params.BackBufferHeight=480;params.BackBufferFormat=D3DFMT_X8R8G8B8;params.BackBufferCount=1;params.SwapEffect=D3DSWAPEFFECT_DISCARD;params.hDeviceWindow=window;params.Windowed=TRUE;
     IDirect3DDevice8 *first=nullptr,*second=nullptr;
     check(SUCCEEDED(api->CreateDevice(0,D3DDEVTYPE_HAL,window,D3DCREATE_HARDWARE_VERTEXPROCESSING,&params,&first)),"Create first device");
+    check(SendMessageA(window,WM_GETICON,ICON_SMALL,0)!=0&&SendMessageA(window,WM_GETICON,ICON_BIG,0)!=0,"Game window has branded small and large icons");
     downstream=reinterpret_cast<WNDPROC>(SetWindowLongPtrA(window,GWLP_WNDPROC,reinterpret_cast<LONG_PTR>(forwarder)));
     check(downstream!=nullptr,"Layer a forwarding window procedure");
     const auto caption=[&]{return (GetWindowLongA(window,GWL_STYLE)&WS_CAPTION)!=0;};
