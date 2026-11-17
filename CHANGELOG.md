@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.1.0-pre.7 - 2026-11-17
+
+- Fix reused network clients retaining disconnected/session state, reject duplicate live or pending connections, and prevent an old close from cancelling a newly connected reader. Close failed handshakes and finish reader cleanup after stream shutdown errors.
+- Add session-scoped host return to lobby and require the connected/ready/two-team barrier again. Clear old confirmed/queued input and reject delayed old-session relays or stop commands. Transport protocol 2 requires updated clients and server; this source-only foundation is not integrated with playable online matches.
+- Permit virtual-pad acquisition on private test desktops only with a stable enabled diagnostic packet from the existing PID-local protocol. Preserve normal foreground rejection and immediately revoke diagnostic access when disabled.
+- Extend GPU coverage to localized 3D stencil footprints beyond both former 4:3 edges, with unmarked-pixel, source-vertex and graphics-state controls.
+- Verify four virtual seats in the owner game, windowed gameplay/replay return and natural movie completion through resize/minimize/restore. Document input-cache, snapshot and random-state ownership needed for future synchronization; physical controllers and cross-process determinism remain separate acceptance work.
+- Make reconnect lease tests independent of scheduling delays and verify just-before/exact/after-deadline behavior.
+
 ## 0.1.0-pre.6 - 2026-11-17
 
 - Prevent the verified save worker's idle path from clearing a request queued after its command snapshot. Preserve normal/invalid dispatch and require matching worker signatures; do not rewrite saves or turn errors into success.

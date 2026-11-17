@@ -1,7 +1,7 @@
 # OpenSoccerMania work board
 
-Updated: 2026-11-17. Current baseline: 0.1.0-pre.6. See
-[scope and limits](releases/0.1.0-pre.6.md).
+Updated: 2026-11-17. Current baseline: 0.1.0-pre.7. See
+[scope and limits](releases/0.1.0-pre.7.md).
 
 ## Continuation verification, 2026-11-17
 
