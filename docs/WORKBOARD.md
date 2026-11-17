@@ -3,6 +3,44 @@
 Updated: 2026-11-17. Current published baseline: 0.1.0-pre.8. See
 [pre.8 scope and limits](releases/0.1.0-pre.8.md).
 
+## Catalog submissions and public visibility, 2026-11-17
+
+- The user requests Quiver Launcher and recomplauncher.com listings under
+  MatyMeatBoy, extended to the user's game/launcher projects. Both public catalogs
+  already contain ReKHCoM, ShiningSource and NewSnapRecomp. Both verified developer
+  profiles use the current classic Meat Boy GitHub avatar; do not duplicate those
+  entries or replace the profile picture unnecessarily.
+- Made [SaturnTaisenFirst](https://github.com/MatyMeatBoy/SaturnTaisenFirst) public
+  after checking its tracked history for private inputs/credential candidates.
+  Updated its public description and README visibility wording; preserved the
+  active local worktree's uncommitted code. Created and pushed public
+  [DynaBrothers1-2](https://github.com/MatyMeatBoy/DynaBrothers1-2) from audited
+  committed source `c6e849edf66ff7e835c3e673d2b6fb7d0e5970e0`, retaining its
+  `work/dynabrothers` branch and unrelated pending local changes.
+- Published reviewable catalog cards on separate `codex/catalog-listing` branches:
+  [OpenSoccerMania](https://github.com/MatyMeatBoy/OpenSoccerMania/blob/codex/catalog-listing/docs/catalog/README.md),
+  [Sakura Wars](https://github.com/MatyMeatBoy/SaturnTaisenFirst/blob/codex/catalog-listing/docs/catalog/README.md)
+  and [Dyna Brothers](https://github.com/MatyMeatBoy/DynaBrothers1-2/blob/codex/catalog-listing/docs/catalog/README.md).
+  Each has bounded descriptions, requirements, credits, an original/code-native
+  project icon, a real unaltered runtime capture and a media manifest. All five
+  files per card match their public downloads. OpenSoccerMania is explicitly a
+  PC compatibility/mod launcher, not a console recompilation; Dyna Brothers is
+  source development without a published standalone ZIP at this point.
+- Additional public-release drafts cover ShiningSoul2Recomp and
+  Ultimate2C-FixDuplicates. The latter is a hardware utility whose repair/restore
+  requires user-approved elevation; it must not be advertised as an automatic
+  game patch or applied silently. Forks need distinct-project/release review and
+  upstream credits. Research libraries and unrelated software are not represented
+  as playable native games. The full inventory stays private under
+  `local/catalog-submissions/submission-inventory.json`.
+- **No new catalog submissions have been sent.** Both portals require authenticated
+  account access. The Chrome/computer-use runtime fails before connecting
+  (`failed to write kernel assets`, missing path), including reset/retry. Do not
+  bypass authentication, claim a pending entry is accepted, or duplicate the
+  three existing entries. Public cards and local evidence are ready for the
+  authenticated portal pass when access is restored. Contact details are not
+  included in public cards. Prior accepted release artifacts remain unchanged.
+
 ## Controller-family baseline, 2026-11-17
 
 - Published [pre.8](https://github.com/MatyMeatBoy/OpenSoccerMania/releases/tag/v0.1.0-pre.8)
