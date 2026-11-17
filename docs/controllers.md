@@ -92,6 +92,12 @@ movie_skip=False)` preserves the packet size. Outside internal settings, native
 keyboard merging accepts full keys only with explicit diagnostic flag 2. Movie
 flag 16 permits only Escape and only while the native movie flag is active.
 Gameplay movement/actions never travel through this keyboard page.
+Virtual-pad acquisition also honors flags 1+2 only from a stable PID-local packet
+for isolated diagnostics. Missing, disabled, odd-sequence or invalid-magic packets
+retain normal foreground rejection; revocation returns neutral input immediately.
+The authorization packet has no heartbeat timeout of its own; the pad state page
+still expires after 500 ms without updates. Production SDL input never sets flag 2.
+
 
 Pads: `Local\OpenSoccerMania-Pads-<pid>`, 160 bytes. Eight header DWORDs: magic
 `0x504d534f`, version 1, sequence, flags, four reserved. Flag 1 enables input;
@@ -120,6 +126,8 @@ run loads the actual proxy DLL and exercises four devices through the real syste
 DirectInput factory. Missing and late producers have separate regressions.
 
 These checks do not constitute a four-physical-controller match test. Physical
-hardware, wireless reconnects, vendor-specific raw layouts and live four-player
-seat assignment still require verification with the owner's controllers. No
+hardware, wireless reconnects, vendor-specific raw layouts and complete matches still require verification with the owner's controllers.
+A private direct-page producer has assigned Joypads 1/2 and 3/4 to opposing teams
+in the real game and exercised individual inputs with four player indicators.
+This accepts the native four-seat route, not physical SDL discovery or hardware. No
 online transport is introduced by this local four-slot input protocol.

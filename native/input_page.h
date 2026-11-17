@@ -2,6 +2,28 @@
 #include <windows.h>
 #include <cstdio>
 namespace osm {
+// Read-only ownership of explicitly requested PID-local background diagnostics.
+// An absent, disabled or unstable packet never weakens normal focus checks.
+class PrivateInputDiagnostics {
+    HANDLE mapping_=nullptr;const volatile DWORD* words_=nullptr;
+    ULONGLONG retry_=0;
+public:
+    ~PrivateInputDiagnostics(){if(words_)UnmapViewOfFile(const_cast<const DWORD*>(words_));if(mapping_)CloseHandle(mapping_);}
+    bool enabled() {
+        if(!words_&&GetTickCount64()>=retry_) {
+            retry_=GetTickCount64()+100;
+            char name[96];std::snprintf(name,sizeof(name),"Local\\OpenSoccerMania-Input-%lu",GetCurrentProcessId());
+            mapping_=OpenFileMappingA(FILE_MAP_READ,FALSE,name);
+            if(mapping_)words_=static_cast<const volatile DWORD*>(MapViewOfFile(mapping_,FILE_MAP_READ,0,0,272));
+            if(mapping_&&!words_){CloseHandle(mapping_);mapping_=nullptr;}
+        }
+        if(!words_)return false;
+        const DWORD sequence=words_[1];
+        if(sequence&1)return false;
+        const DWORD magic=words_[0],flags=words_[2];MemoryBarrier();
+        return words_[1]==sequence&&magic==0x494d534f&&(flags&3)==3;
+    }
+};
 class PrivateKeyboard {
     HANDLE mapping_=nullptr;
     const unsigned char* memory_=nullptr;

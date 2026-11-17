@@ -9,6 +9,7 @@
 #include <new>
 #include <cstdlib>
 #include "controller_input.h"
+#include "input_page.h"
 #include "ui_state.h"
 namespace osm {
 inline void pad_info(unsigned slot,DIDEVICEINSTANCEA& info) {
@@ -31,6 +32,7 @@ inline DIDEVICEOBJECTINSTANCEA pad_object(unsigned index) {
 class VirtualPad final:public IDirectInputDevice8A {
     struct Field {DWORD offset;unsigned kind,index;}; // axis, button, neutral POV
     volatile LONG references_=1;unsigned slot_;PadReader* reader_;UiStateReader* ui_;
+    PrivateInputDiagnostics diagnostics_;
     HWND window_=nullptr;DWORD cooperative_=DISCL_FOREGROUND;bool acquired_=false;
     DWORD data_size_=0,buffer_size_=0,sequence_=0;LONG low_[8]={-1000,-1000,-1000,-1000,-1000,-1000,-1000,-1000},high_[8]={1000,1000,1000,1000,1000,1000,1000,1000};
     DWORD deadzone_=0,saturation_=10000;std::vector<Field> fields_;
@@ -60,7 +62,7 @@ class VirtualPad final:public IDirectInputDevice8A {
     }
     HRESULT sample(std::vector<unsigned char>& bytes) {
         if(!acquired_)return DIERR_NOTACQUIRED;
-        if((cooperative_&DISCL_FOREGROUND)&&window_&&GetForegroundWindow()!=window_){acquired_=false;return DIERR_INPUTLOST;}
+        if((cooperative_&DISCL_FOREGROUND)&&window_&&GetForegroundWindow()!=window_&&!diagnostics_.enabled()){acquired_=false;return DIERR_INPUTLOST;}
         PadState state={};bool gameplay=false;if(!reader_->read(slot_,state,&gameplay))return DIERR_UNPLUGGED;
         if(have_context_&&last_gameplay_!=gameplay){blocked_buttons_|=state.buttons;block_axes_=true;}
         have_context_=true;last_gameplay_=gameplay;

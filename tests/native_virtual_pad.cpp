@@ -59,6 +59,30 @@ int main(int argc,char** argv){
     assert(pads[0]->GetDeviceState(sizeof(state),&state)==DI_OK&&state.lX==65535&&state.rgbButtons[0]==0x80);
     assert(pads[0]->SetCooperativeLevel(reinterpret_cast<HWND>(1),DISCL_FOREGROUND)==DI_OK);
     assert(pads[0]->GetDeviceState(sizeof(state),&state)==DIERR_INPUTLOST);
+    // Explicit PID-local diagnostics alone may authorize a private-desktop pad.
+    char diagnostic_name[96];std::snprintf(diagnostic_name,sizeof(diagnostic_name),"Local\\OpenSoccerMania-Input-%lu",GetCurrentProcessId());
+    HANDLE diagnostic_mapping=CreateFileMappingA(INVALID_HANDLE_VALUE,nullptr,PAGE_READWRITE,0,272,diagnostic_name);assert(diagnostic_mapping);
+    auto* diagnostic_page=static_cast<DWORD*>(MapViewOfFile(diagnostic_mapping,FILE_MAP_WRITE,0,0,272));assert(diagnostic_page);
+    std::memset(diagnostic_page,0,272);diagnostic_page[0]=0x494d534f;diagnostic_page[1]=2;Sleep(110);
+    for(DWORD flags:{DWORD(0),DWORD(1),DWORD(2)}){diagnostic_page[2]=flags;MemoryBarrier();assert(pads[0]->Acquire()==DIERR_INPUTLOST);}
+    diagnostic_page[2]=3;diagnostic_page[0]=0;MemoryBarrier();assert(pads[0]->Acquire()==DIERR_INPUTLOST);
+    diagnostic_page[0]=0x494d534f;diagnostic_page[1]=3;MemoryBarrier();assert(pads[0]->Acquire()==DIERR_INPUTLOST);
+    diagnostic_page[1]=4;MemoryBarrier();publisher.commit();
+    assert(pads[0]->Acquire()==DI_OK);
+    assert(pads[0]->GetDeviceState(sizeof(state),&state)==DI_OK&&state.lX==65535&&state.rgbButtons[0]==0x80);
+    for(unsigned i=1;i<4;++i){
+        assert(pads[i]->SetCooperativeLevel(reinterpret_cast<HWND>(1),DISCL_FOREGROUND)==DI_OK&&pads[i]->Acquire()==DI_OK);
+        DIJOYSTATE2 independent={};assert(pads[i]->GetDeviceState(sizeof(independent),&independent)==DI_OK);
+        assert(independent.lX==(i==1?-1000:0)&&independent.lY==(i==2?-1000:i==3?1000:0));
+        assert(pads[i]->SetCooperativeLevel(nullptr,DISCL_FOREGROUND)==DI_OK);
+    }
+    diagnostic_page[1]=5;MemoryBarrier();assert(pads[0]->GetDeviceState(sizeof(state),&state)==DIERR_INPUTLOST);
+    diagnostic_page[1]=6;MemoryBarrier();assert(pads[0]->Acquire()==DI_OK);
+    diagnostic_page[0]=0;MemoryBarrier();assert(pads[0]->GetDeviceState(sizeof(state),&state)==DIERR_INPUTLOST);
+    diagnostic_page[0]=0x494d534f;diagnostic_page[1]=8;MemoryBarrier();assert(pads[0]->Acquire()==DI_OK);
+    diagnostic_page[2]=1;diagnostic_page[1]=10;MemoryBarrier();
+    assert(pads[0]->GetDeviceState(sizeof(state),&state)==DIERR_INPUTLOST&&state.lX==32767&&state.rgbButtons[0]==0);
+    diagnostic_page[0]=0;UnmapViewOfFile(diagnostic_page);CloseHandle(diagnostic_mapping);
     assert(pads[0]->SetCooperativeLevel(nullptr,DISCL_FOREGROUND)==DI_OK&&pads[0]->Acquire()==DI_OK);
     DIPROPDWORD buffer={{sizeof(DIPROPDWORD),sizeof(DIPROPHEADER),0,DIPH_DEVICE},8};
     assert(pads[0]->Unacquire()==DI_OK);

@@ -5,6 +5,27 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.6. See
 
 ## Continuation verification, 2026-11-17
 
+- Added explicit private diagnostic ownership for virtual-pad acquisition,
+  reusing the PID-local keyboard packet. A stable enabled+diagnostic packet is
+  required; missing, normal, disabled, invalid-magic or odd-sequence pages cannot
+  bypass focus. Revocation immediately restores lost-input/neutral output. The
+  old fixture fails at diagnostic Acquire; the new one covers all four separate
+  states and revocation. All 21 named native checks plus absent/late producer and
+  actual-DLL factory controls pass. Independent review found no actionable issues.
+- The real game now assigns Joypads 1/2 to Arctic Medics and 3/4 to Leo's Lions.
+  A direct private page producer exercises each slot individually during active
+  gameplay; captures show four colored player indicators and subsequent motion.
+  The process closes cleanly, input desktop remains unchanged and copied saves
+  match their seed hashes. Evidence:
+  `local/acceptance-2026-11-17/four-pad-diagnostics/summary.json`. Physical SDL
+  discovery is bypassed by this producer; physical four-controller matches,
+  wireless hardware and complete-match acceptance remain open.
+- Python rerun passes all 125 tests with one privilege skip after the owned game
+  probe closes. The first concurrent run exposes a timing-sensitive reconnect
+  fixture: its 200 ms lease expires before the valid resume, returning invalid
+  credentials after cleanup. Preserve the failed log and investigate deterministic
+  lease-boundary coverage rather than treating that run as green. Logs:
+  `local/release-verification/pre6-build/postrelease-pad-python*.log`.
 - Four-pad real-game acceptance remains open. A private producer selects the
   SDL-four-device route, but isolated-desktop focus inspection reports no
   foreground window. `VirtualPad::sample` requires foreground ownership for
