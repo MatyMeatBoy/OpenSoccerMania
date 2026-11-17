@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdint>
+#include <initializer_list>
 static unsigned char image_padding[0x300000];
 struct Vertex {float x,y,z,rhw;DWORD color;};
 static void check(bool value,const char* text){if(!value){std::fprintf(stderr,"FAIL: %s\n",text);std::exit(1);}}
@@ -37,7 +38,8 @@ static DWORD sample(IDirect3DDevice8* device,const char* capture,unsigned x,unsi
     if(capture){FILE* file=std::fopen(capture,"wb");check(file!=nullptr,"Create private output capture");std::fprintf(file,"P6\n1920 1080\n255\n");for(unsigned py=0;py<1080;++py)for(unsigned px=0;px<1920;++px){const DWORD p=pixel(px,py);const BYTE rgb[]={BYTE(p>>16),BYTE(p>>8),BYTE(p)};std::fwrite(rgb,3,1,file);}std::fclose(file);}
     image->UnlockRect();image->Release();back->Release();return result;
 }
-int main() {
+int main(int argc,char** argv) {
+    const bool masked=argc==2&&std::strcmp(argv[1],"--masked")==0;
     producer_fixture();
     WNDCLASSA cls={};cls.hInstance=GetModuleHandleA(nullptr);cls.lpfnWndProc=procedure;cls.lpszClassName="OSMWorldStencilRegression";RegisterClassA(&cls);
     HWND window=CreateWindowA(cls.lpszClassName,"OpenSoccerMania world effect test",WS_OVERLAPPEDWINDOW,0,0,640,480,nullptr,nullptr,cls.hInstance,nullptr);
@@ -53,6 +55,45 @@ int main() {
     device->SetRenderState(D3DRS_ZENABLE,FALSE);device->SetRenderState(D3DRS_ZWRITEENABLE,FALSE);device->SetRenderState(D3DRS_CULLMODE,D3DCULL_NONE);device->SetRenderState(D3DRS_FOGENABLE,FALSE);device->SetRenderState(D3DRS_ALPHABLENDENABLE,TRUE);device->SetRenderState(D3DRS_SRCBLEND,D3DBLEND_SRCALPHA);device->SetRenderState(D3DRS_DESTBLEND,D3DBLEND_INVSRCALPHA);
     device->SetRenderState(D3DRS_STENCILENABLE,TRUE);device->SetRenderState(D3DRS_STENCILFUNC,D3DCMP_EQUAL);device->SetRenderState(D3DRS_STENCILREF,1);device->SetRenderState(D3DRS_STENCILMASK,~0u);device->SetRenderState(D3DRS_STENCILWRITEMASK,0);device->SetRenderState(D3DRS_STENCILPASS,D3DSTENCILOP_KEEP);
     auto draw=[&](const Vertex* data){check(SUCCEEDED(device->Clear(0,nullptr,D3DCLEAR_TARGET|D3DCLEAR_ZBUFFER|D3DCLEAR_STENCIL,0xffffffff,1,1)),"Clear test frame");check(SUCCEEDED(device->BeginScene()),"Begin scene");check(SUCCEEDED(device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP,2,data,sizeof(Vertex))),"Draw test composite");check(SUCCEEDED(device->EndScene()),"End scene");};
+    if(masked) {
+        // A localized 3D stencil footprint beyond the old centered 4:3 frame.
+        // Geometry creates the mask; only the inspected screen resolve may shade it.
+        check(SUCCEEDED(device->Clear(0,nullptr,D3DCLEAR_TARGET|D3DCLEAR_ZBUFFER|D3DCLEAR_STENCIL,0xffffffff,1,0)),"Clear localized stencil frame");
+        D3DMATRIX identity={};identity._11=identity._22=identity._33=identity._44=1;
+        device->SetTransform(D3DTS_WORLD,&identity);device->SetTransform(D3DTS_VIEW,&identity);device->SetTransform(D3DTS_PROJECTION,&identity);
+        struct WorldVertex {float x,y,z;DWORD color;};
+        const WorldVertex footprint[]={{-1,.8f,.5f,0xffffffff},{-.8f,.8f,.5f,0xffffffff},{-1,-.8f,.5f,0xffffffff},{-.8f,-.8f,.5f,0xffffffff}};
+        const WorldVertex right_footprint[]={{.8f,.8f,.5f,0xffffffff},{1,.8f,.5f,0xffffffff},{.8f,-.8f,.5f,0xffffffff},{1,-.8f,.5f,0xffffffff}};
+        device->SetVertexShader(D3DFVF_XYZ|D3DFVF_DIFFUSE);
+        device->SetRenderState(D3DRS_COLORWRITEENABLE,0);
+        device->SetRenderState(D3DRS_STENCILFUNC,D3DCMP_ALWAYS);
+        device->SetRenderState(D3DRS_STENCILWRITEMASK,~0u);
+        device->SetRenderState(D3DRS_STENCILPASS,D3DSTENCILOP_REPLACE);
+        check(SUCCEEDED(device->BeginScene()),"Begin localized stencil scene");
+        check(SUCCEEDED(device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP,2,footprint,sizeof(WorldVertex))),"Write localized 3D stencil footprint");
+        check(SUCCEEDED(device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP,2,right_footprint,sizeof(WorldVertex))),"Write opposite 3D stencil footprint");
+        device->SetRenderState(D3DRS_COLORWRITEENABLE,15);
+        device->SetRenderState(D3DRS_STENCILFUNC,D3DCMP_EQUAL);
+        device->SetRenderState(D3DRS_STENCILWRITEMASK,0);
+        device->SetRenderState(D3DRS_STENCILPASS,D3DSTENCILOP_KEEP);
+        device->SetVertexShader(0x44);
+        check(SUCCEEDED(device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP,2,world,sizeof(Vertex))),"Resolve localized stencil");
+        check(SUCCEEDED(device->EndScene()),"End localized stencil scene");
+        const DWORD marked=sample(device,"localized-world-stencil.ppm",100,540);
+        const DWORD right=sample(device,nullptr,1820,540);
+        const DWORD unmarked=sample(device,nullptr,960,540),above=sample(device,nullptr,100,0);
+        std::printf("localized left=%06lx right=%06lx center=%06lx above=%06lx\n",marked,right,unmarked,above);
+        check((marked&255)<200&&(right&255)<200,"Localized world shadows survive beyond both original 4:3 edges");
+        check((unmarked&255)>240&&(above&255)>240,"Stencil resolve leaves unmarked scene pixels untouched");
+        check(std::memcmp(world,quad,sizeof(quad))==0,"Localized resolve preserves original producer vertices");
+        for(const auto state:{D3DRS_STENCILENABLE,D3DRS_STENCILFUNC,D3DRS_STENCILREF,D3DRS_STENCILWRITEMASK,D3DRS_STENCILPASS,D3DRS_COLORWRITEENABLE}) {
+            DWORD value=0;check(SUCCEEDED(device->GetRenderState(state,&value)),"Read preserved composite state");
+            const DWORD expected=state==D3DRS_STENCILENABLE?TRUE:state==D3DRS_STENCILFUNC?D3DCMP_EQUAL:state==D3DRS_STENCILREF?1:state==D3DRS_STENCILWRITEMASK?0:state==D3DRS_STENCILPASS?D3DSTENCILOP_KEEP:15;
+            check(value==expected,"Localized composite preserves stencil and color-write states");
+        }
+        device->Release();api->Release();DestroyWindow(window);
+        std::puts("PASS: localized 3D stencil shadow outside 4:3 with unmarked controls");return 0;
+    }
     draw(world);const DWORD world_edge=sample(device,"world-stencil.ppm",100,540),world_center=sample(device,nullptr,960,540);
     std::printf("world edge=%06lx center=%06lx\n",world_edge,world_center);
     check((world_edge&255)<200&&(world_center&255)<200,"World stencil composite must shade beyond the original 4:3 center");

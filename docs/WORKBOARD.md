@@ -5,6 +5,16 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.6. See
 
 ## Continuation verification, 2026-11-17
 
+- Added localized stencil GPU coverage beyond both former 4:3 edges. Real 3D
+  geometry writes left/right stencil footprints, then the exact inspected world
+  resolve shades only those marked pixels. Unmarked center/top, producer bytes
+  and stencil/color-write states remain unchanged. The final fixture fails
+  against the historical uncorrected bridge (both outer samples white) and
+  passes against the current bridge (both `bfbfbf`, controls `ffffff`). All 28
+  integration cases pass (`gpu-m_ys8tet`); independent review found no actionable
+  issues. Paired receipt:
+  `local/world-effect-evidence/localized-stencil-verification.json`. This accepts
+  the specific composite with localized geometry, not all real net/shadow scenes.
 - Stabilized reconnect acceptance without changing production lease behavior.
   Sensitive tests replace only the server module's time reference; asyncio and
   client timeouts retain real clocks. Successful authenticated reconnect survives

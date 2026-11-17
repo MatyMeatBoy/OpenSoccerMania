@@ -43,3 +43,23 @@ An isolated real-game trace confirmed four producer draws with the expected sign
 An asset-free GPU regression exercises the production bridge with these inspected producer signatures and vertices placed in unused padding in its own executable image. With the old bridge, the outer pixel remained white (`ffffff`) while the center received the shadow (`bfbfbf`). The corrected bridge shades both, including the first and last pixels at 1920×1080. An ordinary quad with identical depth/RHW still leaves the side area white. A separate render-target control catches accidental backbuffer edge expansion: an intentionally unguarded implementation fails, while the final correction preserves that path. All runs use an isolated desktop; private evidence is under `local/world-effect-evidence/world-stencil-evidence.json`.
 
 This verifies the specific full-screen stencil resolve and the real producer match. Individual map, goal-net and replay compositions still require broader visual acceptance.
+
+## Localized stencil coverage, 2026-11-17
+
+The asset-free `world_effects_render --masked` case writes two localized stencil
+footprints using 3D geometry outside the former centered 4:3 region. Color writes
+are disabled during mask construction. The exact inspected screen-space resolve
+then darkens both outer patches (`bfbfbf`) while leaving the unmarked center and
+upper control white (`ffffff`). Producer vertices and stencil enable/function/
+reference/write mask/pass operation and color-write state remain unchanged.
+
+The final fixture fails against the historical uncorrected bridge: both marked
+outer samples stay white. It passes against the current production bridge;
+all 28 GPU/input/import cases pass in `build/tests/gpu-m_ys8tet/report.json`.
+The paired private receipt is
+`local/world-effect-evidence/localized-stencil-verification.json`.
+Independent review found no actionable issues in this additional coverage.
+
+This strengthens acceptance of the known stencil-composite correction. It does
+not prove every real map, shadow producer, net occlusion or replay composition.
+No production graphics behavior changes in this verification pass.

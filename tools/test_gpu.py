@@ -74,6 +74,8 @@ def main():
             variants = [()]
             if name == 'screen_render':
                 variants += [('--horizon',), ('--far-boundary',), ('--color-only',)]
+            elif name == 'world_effects_render':
+                variants += [('--masked',)]
             elif name == 'clear_rect':
                 variants += [('--original-aspect',)]
             elif name == 'device_reset':
