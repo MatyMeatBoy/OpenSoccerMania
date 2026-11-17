@@ -40,6 +40,12 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.5. See
   preservation fixes a verified hook defect but is not yet proven to explain the
   intermittent frontend LOAD FAILED response. Evidence: `save-ab-legacy/` and
   `save-ab-fixed/` under `local/acceptance-2026-11-17/`.
+- Four further fresh-process repeats with identical Story profile copies and
+  synchronous status tracing disabled all show LOAD SUCCESSFUL, read the full
+  4800-byte payload, leave save hashes unchanged and close cleanly. Evidence:
+  `save-repeat-1/` through `save-repeat-4/` in the same private evidence root.
+  These successful repeats do not reproduce or close the intermittent failure.
+  Post-release commit `1086340` also passes public CI run `44140253665`.
 - Preview alignment is now verified for the observed animated model path. The
   model renderer and its clear operation have separate, signature-checked caller
   scopes; the preceding UI flush is not marked as model geometry. Local preview
