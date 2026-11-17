@@ -5,10 +5,25 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.6. See
 
 ## Continuation verification, 2026-11-17
 
+- Mapped the raw DirectInput cache (`pad +0x2b8`, 272 bytes), normalization and
+  gameplay control edge fields. Corrected the earlier generic-update attribution:
+  the direct-pad wrapper is `0x42e440 -> 0x42e680`, with message-pump/menu callers;
+  `0x410740` alone does not establish its ownership. Gameplay records refresh at
+  `0x485560` and have separate compact save/restore callbacks retaining held,
+  pressed, released and previous masks. In an active-match private pulse trace,
+  all 1558 complete target-control/next-marker pairs retain those four masks;
+  all 196 observed A press edges reach the next marker. No suspected edge loss
+  is reproduced in this selected case. The probe closes cleanly with copied
+  saves and input desktop unchanged. Evidence:
+  `local/netplay-cache-2026-11-17/summary.json`. Logging covers one normalized
+  target; it does not prove full four-pad equivalence or deterministic online
+  simulation. See [cache ownership](network-input-cache.md). No production
+  input/scheduler behavior changed.
 - Inspected the engine/network boundary instead of routing relay frames through
   an assumed tick callback. `0x41fc70` only advances clock/snapshot bank; its sole
-  inspected call is inside the pending-step loop, while device update runs in
-  the outer loop. The iteration backedge bypasses that poll. A private source-copy
+  inspected call is inside the pending-step loop, while a generic device update
+  runs in the outer loop. The backedge bypasses that generic call; the refined
+  direct-pad and normalized-control ownership is documented above. A private source-copy
   trace records 2048 successful pad reads and 512 marker calls on one thread;
   pad 0 has two reads at 77 tick values. Thus the current latest-state mailbox is
   not a confirmed per-step input gate. The selected phase includes map/player

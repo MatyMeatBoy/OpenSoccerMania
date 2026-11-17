@@ -10,7 +10,7 @@ iterations; it is not a verified place to inject a complete network frame.
 
 | Location | Inspected operation |
 | --- | --- |
-| `0x406630` | Calls `0x410740(0)`, which iterates device-update callbacks. |
+| `0x406630` | Calls a generic device-update path `0x410740(0)`; not the direct-pad pump identified below. |
 | `0x406704` | Queries the pending iteration count via `0x41fc10`. |
 | `0x40671c` | Calls the clock/bank marker; its return site is `0x406721`. |
 | `0x406885` / `0x40688d` | Surrounding mode-dependent dispatch calls; full update ownership remains unverified. |
@@ -18,10 +18,12 @@ iterations; it is not a verified place to inject a complete network frame.
 | `0x406961` | Iteration backedge to `0x406718`, bypassing the outer device update. |
 | `0x42eb6f` | Calls DirectInput GetDeviceState for 272 bytes; return site `0x42eb72`. |
 
-The input poll is therefore outside the pending-step loop. A render iteration
-can poll without advancing that clock, and the inspected backedge permits
-multiple clock advances without repeating the outer device update. The latter
-is a static control-flow property, not a count measured in the selected trace.
+The inspected backedge bypasses the named generic outer device-update call.
+It does not by itself establish all raw-pad polling locations. Follow-up cache
+inspection identifies the actual pad wrapper and the normalized gameplay control
+refresh separately; see [cache/edge ownership](network-input-cache.md). The
+runtime observations below establish repeated pad reads at the same recorded
+tick without depending on the initial generic-update attribution.
 
 ## Isolated runtime ordering
 
@@ -49,8 +51,8 @@ all copied save hashes. Private evidence:
 A future adapter must identify the cached normalized controller states and edge
 handling consumed by each logical update, then deliver exactly the confirmed
 four-seat frame there. Repeating the current latest-state pad mailbox or waiting
-inside the clock marker alone does not establish this property: device polling
-has already happened, and catch-up iterations bypass it.
+inside the clock marker alone does not establish this property: the normalized refresh and snapshot restoration have their own ownership, and
+the inspected iteration backedge bypasses that outer refresh.
 
 It must also verify initial map/team/state/RNG equivalence, authoritative game
 state checksums, scheduler behavior while waiting, and divergent-state recovery

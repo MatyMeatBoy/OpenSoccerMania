@@ -21,7 +21,8 @@ The fastest currently verified original selection is therefore **50 Hz**. No 60 
 Further control-flow inspection identifies `0x41fc70` as the clock/interpolation
 bank advance within the original pending-step loop. The measured marker rate
 still identifies that loop's steady-state iteration rate; the function itself
-is not the full simulation update. Device polling occurs earlier in the outer
-loop and is not one-to-one with marker calls. See the
+is not the full simulation update. Normalized control refresh is earlier in the outer
+loop, while raw pad polling follows a separate device wrapper. Raw polling is
+not one-to-one with marker calls in the selected trace. See the
 [network boundary investigation](network-engine-boundary.md) before using this
 hook for frame-tagged input or deterministic replay.
