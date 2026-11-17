@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0-pre.3 — 2026-11-16
+
+- Fix clean-PC imports requesting graphics files: include the pinned official dgVoodoo x86 backend and default configuration, install automatically, and remove component file dialogs.
+- Preserve the original window-message chain before backend device creation, correcting reproduced recursion on device recreation while retaining F11 toggles.
+- Import supported ISO9660/Joliet images without an installed extractor or separate download.
+- Check the frozen launcher with a fresh synthetic ISO and no external process creation, covering automatic graphics provisioning and profile save.
+
 ## 0.1.0-pre.2 — 2026-11-16
 
 - Add an inventoried Windows x64 portable launcher package, including its Python/runtime dependencies and project x86 bridges, with isolated packaged-UI smoke testing.

@@ -8,14 +8,14 @@ import unittest
 import zipfile
 from unittest.mock import patch
 from tests.test_release_package import fixture
-from tools.package_portable import package_portable, REQUIRED_FILES
+from tools.package_portable import package_portable, REQUIRED_FILES, VENDOR_FILES
 
 
 def portable_fixture(root):
     root.mkdir()
     for name in REQUIRED_FILES:
         path = root / name; path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(b'MZfixture' if name.endswith(('.exe', '.dll')) else b'public fixture')
+        path.write_bytes((Path(__file__).resolve().parents[1] / name).read_bytes() if name in VENDOR_FILES else (b'MZfixture' if name.endswith(('.exe', '.dll')) else b'public fixture'))
     (root / 'python311.dll').write_bytes(b'MZpython fixture')
     (root / '_tcl_data').mkdir(); (root / '_tcl_data/init.tcl').write_text('public dependency')
     return root
@@ -68,6 +68,27 @@ class PortablePackageTests(unittest.TestCase):
                     parent = path.parent
                     while parent != tree and not any(parent.iterdir()):
                         parent.rmdir(); parent = parent.parent
+
+    def test_pinned_vendor_missing_and_tampered_files_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); repo, revision, tree, expected = self.fixture(root)
+            for name in VENDOR_FILES:
+                path = tree / name; original = path.read_bytes()
+                with self.subTest(name=name, state='missing'):
+                    path.unlink()
+                    with self.assertRaisesRegex(ValueError, 'required'):
+                        self.build(repo, revision, tree, root / 'bad.zip', expected)
+                path.write_bytes(original + b'tampered')
+                with self.subTest(name=name, state='tampered'):
+                    with self.assertRaisesRegex(ValueError, 'vendor hash'):
+                        self.build(repo, revision, tree, root / 'bad.zip', expected)
+                path.write_bytes(original)
+            for name in ('runtime/graphics/dgVoodoo/foreign.dll', 'runtime/graphics/other/d3d8.dll'):
+                path = tree / name; path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(b'wrapper')
+                with self.assertRaises(ValueError):
+                    self.build(repo, revision, tree, root / 'bad.zip', expected)
+                path.unlink()
+                if path.parent.name == 'other':path.parent.rmdir()
 
     def test_required_files_and_native_hash_mismatch_rejected(self):
         with tempfile.TemporaryDirectory() as temp:

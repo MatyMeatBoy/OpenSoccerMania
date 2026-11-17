@@ -1,6 +1,6 @@
 """Create an immutable, inventoried source ZIP from an exact Git commit.
 
-No worktree data, game files or graphics wrappers are read. Repeated packaging
+No worktree data, game files or unapproved graphics wrappers are read. Repeated packaging
 with the same commit/version and Python/zlib toolchain produces identical ZIPs.
 """
 import argparse
@@ -24,6 +24,20 @@ DENIED_SUFFIXES = {'.exe', '.dll', '.iso', '.bin', '.cue', '.img', '.mdf', '.mds
                    '.nrg', '.zip', '.7z', '.rar', '.ogg', '.wav', '.mp4', '.avi',
                    '.bik', '.bmp', '.log', '.sav', '.bak', '.pyc', '.pdb', '.obj',
                    '.o', '.a', '.lib', '.so', '.dylib', '.dat', '.conf'}
+# Exact unmodified vendor release approved for this dedicated game launcher.
+VENDOR_FILES = {
+    'runtime/graphics/dgVoodoo/d3d8.dll': '25a0ceeb85fcc4675c6f964442eecc14fedd504effd39c931a627249ad4685e2',
+    'runtime/graphics/dgVoodoo/dgVoodoo.conf': '45cc0eb8e6ed4f067aca1b2e4ac1268dfbd164bbbd06d264c53e8a60642c4dbf',
+    'runtime/graphics/dgVoodoo/manifest.json': '44e4899cf4baf6d975f1f1e80ccf5c2914c97c1870082fd1dcf9c362f3396a56',
+}
+VENDOR_LICENSE = 'licenses/dgVoodoo.txt'
+
+
+def validate_vendor_file(name, data):
+    if name in VENDOR_FILES and hashlib.sha256(data).hexdigest() != VENDOR_FILES[name]:
+        raise ValueError('Bundled graphics vendor hash mismatch: ' + name)
+
+
 MAX_FILE_BYTES = 64 * 1024**2
 MAX_TOTAL_BYTES = 256 * 1024**2
 MAX_FILES = 10000
@@ -65,11 +79,11 @@ def _validate_member(name, mode):
         raise ValueError('Build output cannot be packaged: ' + name)
     if parts[0] == 'assets' and name not in ALLOWED_ASSETS:
         raise ValueError('Asset requires explicit public redistribution approval: ' + name)
-    if parts[0] == 'runtime' and name != 'runtime/SDL3.dll':
+    if parts[0] == 'runtime' and name != 'runtime/SDL3.dll' and name not in VENDOR_FILES:
         raise ValueError('Unapproved runtime binary: ' + name)
-    if path.suffix.lower() in DENIED_SUFFIXES and name != 'runtime/SDL3.dll':
+    if path.suffix.lower() in DENIED_SUFFIXES and name != 'runtime/SDL3.dll' and name not in VENDOR_FILES:
         raise ValueError('Binary, game, wrapper or private artifact in source release: ' + name)
-    if 'dgvoodoo' in name.casefold() or path.name.casefold().startswith(('osm-frame-', 'capture', 'screenshot')):
+    if ('dgvoodoo' in name.casefold() and name not in VENDOR_FILES and name != VENDOR_LICENSE) or path.name.casefold().startswith(('osm-frame-', 'capture', 'screenshot')):
         raise ValueError('Wrapper or private capture in source release: ' + name)
 
 
@@ -96,6 +110,8 @@ def _tracked_files(repo, revision):
     names = {entry[0] for entry in entries}
     if 'runtime/SDL3.dll' in names and 'licenses/SDL3.txt' not in names:
         raise ValueError('The SDL3 redistributable requires its license.')
+    if names.intersection(VENDOR_FILES) and not (set(VENDOR_FILES) | {VENDOR_LICENSE}) <= names:
+        raise ValueError('Bundled graphics vendor requires all pinned files and its license.')
     if not {'README.md', 'LICENSE'} <= names:
         raise ValueError('Source release requires README.md and LICENSE.')
     return sorted(entries)
@@ -166,6 +182,7 @@ def package_release(repo, revision, output, version):
                 info.compress_type = zipfile.ZIP_DEFLATED
                 archive.writestr(info, data, compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
             for name, mode, data in _blobs(repo, entries):
+                validate_vendor_file(name, data)
                 write(name, mode, data)
                 inventory.append({'path': name, 'mode': mode, 'size': len(data), 'sha256': hashlib.sha256(data).hexdigest()})
             manifest = {'format': 1, 'version': version, 'source_commit': revision,

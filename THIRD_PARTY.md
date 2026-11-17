@@ -9,4 +9,9 @@
   `licenses/Python/`, PyInstaller's bootloader license/exception in its distribution
   metadata, and Tcl/Tk notices with the collected runtime data.
 
-The game, its media and dgVoodoo2 are user-supplied and are not included. Their ownership and licenses are separate from this project's code.
+- dgVoodoo 2.87.6: unmodified x86 D3D8 component and default configuration,
+  bundled solely for this specific game modification under the author's
+  redistribution terms. See `licenses/dgVoodoo.txt` and the pinned source/hashes
+  in `runtime/graphics/dgVoodoo/manifest.json`. These files are not MIT licensed.
+
+The original game and its media are user-supplied and are not included.

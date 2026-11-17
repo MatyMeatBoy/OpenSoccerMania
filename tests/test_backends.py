@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from opensoccermania.backends import find_library_backend, install_backend, _validate_backend
+from opensoccermania.backends import find_library_backend, install_backend, _validate_backend, ensure_backend, bundled_backend
 
 
 def backend(machine=0x14c, proxy=False):
@@ -44,6 +44,29 @@ def private(root, name, own=False):
 
 
 class BackendTests(unittest.TestCase):
+    def test_bundled_backend_repairs_missing_configuration_without_replacing_dll(self):
+        package=Path(__file__).resolve().parents[1]
+        dll,conf=bundled_backend(package)
+        with tempfile.TemporaryDirectory() as temp:
+            entry=Path(temp);(entry/'opensoccermania-source.json').write_text('{}')
+            (entry/'d3d8.dll').write_bytes(dll.read_bytes())
+            before=(entry/'d3d8.dll').read_bytes()
+            self.assertTrue(ensure_backend(entry,package))
+            self.assertEqual((entry/'dgVoodoo.conf').read_bytes(),conf.read_bytes())
+            self.assertEqual((entry/'d3d8.dll').read_bytes(),before)
+            self.assertFalse(ensure_backend(entry,package))
+
+    def test_bundled_backend_preserves_existing_config_and_reports_broken_package(self):
+        package=Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as temp:
+            entry=Path(temp)/'entry';entry.mkdir()
+            (entry/'opensoccermania-source.json').write_text('{}')
+            (entry/'dgVoodoo.conf').write_text('; custom\n[General]\n')
+            before=(entry/'dgVoodoo.conf').read_bytes()
+            self.assertTrue(ensure_backend(entry,package))
+            self.assertEqual((entry/'dgVoodoo.conf').read_bytes(),before)
+            with self.assertRaisesRegex(ValueError,'complete portable ZIP'):
+                bundled_backend(Path(temp)/'missing-package')
     def test_find_owned_backup_and_preserve_sources(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp); entry, dll, conf = private(root, 'donor', own=True)
@@ -158,7 +181,7 @@ class LauncherBackendImportTests(unittest.TestCase):
         launcher.run_work = lambda work: work()
         return launcher
 
-    def test_import_reuses_private_owner_backend_before_ready(self):
+    def test_import_uses_bundled_backend_without_relying_on_private_library(self):
         from tests.test_core import fixture
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp); home = root / 'local'; library = home / 'library'; library.mkdir(parents=True)
@@ -168,7 +191,8 @@ class LauncherBackendImportTests(unittest.TestCase):
             with patch('opensoccermania.launcher.HOME', home):
                 self.launcher().import_path(source)
             imported = [p for p in library.iterdir() if p.name != 'existing-owner-copy'][0]
-            self.assertEqual((imported / 'd3d8.dll').read_bytes(), before[1])
+            from opensoccermania.backends import BUNDLED_BACKEND_HASHES
+            self.assertEqual(hashlib.sha256((imported / 'd3d8.dll').read_bytes()).hexdigest(), BUNDLED_BACKEND_HASHES['d3d8.dll'])
             self.assertEqual((source / 'Game.exe').read_bytes(), before[0])
             self.assertFalse((source / 'd3d8.dll').exists())
             self.assertEqual((dll.read_bytes(), conf.read_bytes()), before[1:])
@@ -213,13 +237,32 @@ class LauncherBackendImportTests(unittest.TestCase):
             self.assertEqual(hashlib.sha256((entry / 'd3d8.dll').read_bytes()).hexdigest(), before[0])
         self.assertEqual((hashlib.sha256(dll.read_bytes()).hexdigest(), hashlib.sha256(conf.read_bytes()).hexdigest()), before)
 
-    def test_missing_backend_requests_owner_supplied_files(self):
+    def test_clean_pc_import_never_requests_graphics_components(self):
         from tests.test_core import fixture
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp); source = fixture(root / 'original')
-            with patch('opensoccermania.launcher.HOME', root / 'local'):
-                with self.assertRaisesRegex(ValueError, 'owner-supplied'):
-                    self.launcher().import_path(source)
+            with patch('opensoccermania.launcher.HOME', root / 'local'), \
+                 patch('opensoccermania.launcher.filedialog.askopenfilename', side_effect=AssertionError('Unexpected component prompt')):
+                self.launcher().import_path(source)
+            entry=next((root/'local/library').iterdir())
+            self.assertTrue((entry/'d3d8.dll').is_file())
+            self.assertTrue((entry/'dgVoodoo.conf').is_file())
+
+    def test_iso_only_import_with_no_installed_extractor_or_backend(self):
+        from opensoccermania.smoke_fixture import write_game_iso
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);iso=root/'my game.iso';write_game_iso(iso)
+            before=hashlib.sha256(iso.read_bytes()).hexdigest()
+            with patch('opensoccermania.launcher.HOME',root/'fresh-local'), \
+                 patch('opensoccermania.launcher.mounted_iso',side_effect=ValueError('No Windows mount')), \
+                 patch('opensoccermania.disc_images.find_7zip',side_effect=AssertionError('External extractor')), \
+                 patch('subprocess.Popen',side_effect=AssertionError('External process')), \
+                 patch('opensoccermania.launcher.filedialog.askopenfilename',side_effect=AssertionError('Component prompt')):
+                self.launcher().import_path(iso,is_iso=True)
+            entry=next((root/'fresh-local/library').iterdir())
+            self.assertTrue((entry/'d3d8.dll').is_file())
+            self.assertTrue((entry/'dgVoodoo.conf').is_file())
+            self.assertEqual(hashlib.sha256(iso.read_bytes()).hexdigest(),before)
 
 
 

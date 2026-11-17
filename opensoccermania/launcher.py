@@ -8,7 +8,6 @@ import subprocess
 import sys
 import threading
 import hashlib
-from contextlib import ExitStack
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from PIL import Image, ImageDraw, ImageTk, ImageFilter
@@ -17,7 +16,7 @@ from .theme import Bubble, CREAM, GREEN, AMBER, MUTED
 from .sources import discover, discover_assets, prepare, prepare_with_executable, mounted_iso, open_disc_image, probe_disc_image, child
 from .video import VideoSettings, RESOLUTIONS, REFRESH_RATES, AA_MODES, FILTER_MODES, DISPLAY_MODES, RENDER_LIMITS, CAMERA_ZOOMS, EDITIONS, LANGUAGES, configure_wrapper
 from .runtime import setup_portable, install_bridge, install_input_bridge, configure_bridge, read_live_settings
-from .backends import find_library_backend, install_backend
+from .backends import ensure_backend, install_backend
 from .title_assets import load_title_image,TitleAssetError
 from .diagnostics import logger, Session
 from .controllers import ControllerBridge, MATCH, KEYS, RAW_XBOX
@@ -27,12 +26,6 @@ HOME = ROOT / 'local'
 
 class ExecutableSourceRequired(ValueError):
     def __init__(self,path,is_image):self.path,self.is_image=path,is_image
-
-
-class BackendSourceRequired(ValueError):
-    def __init__(self,path,is_image,donor):
-        super().__init__('Select an owner-supplied x86 dgVoodoo D3D8.dll and dgVoodoo.conf to finish this private import.')
-        self.path,self.is_image,self.donor=path,is_image,donor
 
 
 def stadium(size):
@@ -386,7 +379,6 @@ class Launcher:
         def run():
             try:self.queue.put(('ready',work()))
             except ExecutableSourceRequired as error:self.queue.put(('donor',(error.path,error.is_image)))
-            except BackendSourceRequired as error:self.queue.put(('backend',(error.path,error.is_image,error.donor)))
             except Exception as error:
                 self.log.exception('Game import failed');self.queue.put(('error',str(error)))
         threading.Thread(target=run,daemon=True).start()
@@ -409,27 +401,14 @@ class Launcher:
                     info.update(source=str(Path(path).resolve()),source_kind='disc image' if is_iso else 'folder')
                     if is_iso:info['source_image']=str(Path(path).resolve())
                     manifest.write_text(json.dumps(info,indent=2),encoding='utf-8')
-                wrapper=child(target,'d3d8.dll')
-                config=child(target,'dgVoodoo.conf')
-                if not wrapper or not config:
-                    if wrapper or config or child(target,'d3d8_backend.dll') or child(target,'opensoccermania-bridge.sha256'):
-                        raise ValueError('This private entry has an incomplete graphics setup. Its existing files were preserved. Restore its matching D3D8 wrapper and dgVoodoo.conf before importing again.')
-                    supplied=backend or find_library_backend(HOME/'library')
-                    if supplied is None:raise BackendSourceRequired(path,is_iso,donor)
-                    self.queue.put(('status','Copying your graphics backend into the private library entry...'))
-                    if not install_backend(target,*supplied):
-                        raise ValueError('Graphics files appeared during import. They were preserved; review the private entry before retrying.')
+                self.queue.put(('status','Preparing the included graphics runtime...'))
+                if backend:install_backend(target,*backend)
+                ensure_backend(target,ROOT)
                 setup_portable(target,source.sha256)
                 return target
             if is_iso:
                 probe=probe_disc_image(path)
                 if not probe.supported:raise ValueError(probe.reason)
-                if Path(path).suffix.lower()=='.iso' and probe.sector_size==2048:
-                    stack=ExitStack()
-                    try:root=stack.enter_context(mounted_iso(path))
-                    except ValueError:stack.close()
-                    else:
-                        with stack:return copy(root)
                 with open_disc_image(path) as root:return copy(root)
             return copy(path)
         self.status.set('Inspecting game files…');self.run_work(work)
@@ -459,11 +438,11 @@ class Launcher:
             settings.edition=self.edition.get();settings.language=self.language.get();settings.title_extension=self.title_extension.get()
             settings.__post_init__()
             if self.entry:
+                ensure_backend(self.entry,ROOT)
                 config=child(self.entry,'dgVoodoo.conf')
                 wrapper=child(self.entry,'d3d8.dll')
                 if not config or not wrapper:
-                    self.prefs['video']=asdict(settings);self.persist()
-                    self.status.set('Profile saved. Add a dgVoodoo D3D8 wrapper before launching with this profile.');return False
+                    raise ValueError('The included graphics runtime could not be prepared. Extract the complete OpenSoccerMania package again.')
                 bridge=ROOT/'build/native/d3d8.dll'
                 if not bridge.exists():bridge=ROOT/'native/d3d8.dll'
                 install_bridge(self.entry,bridge)
@@ -515,13 +494,6 @@ class Launcher:
                     self.status.set('This source has usable assets but needs an intact executable from another copy you own.')
                     donor=filedialog.askdirectory(title='Choose an intact Soccer / Football Mania copy for private runtime repair')
                     if donor:self.import_path(value[0],value[1],donor)
-                elif kind=='backend':
-                    self.status.set('Choose your own x86 dgVoodoo D3D8.dll and configuration. Your original game files remain unchanged.')
-                    dll=filedialog.askopenfilename(title='Choose your owner-supplied x86 dgVoodoo D3D8.dll',filetypes=[('D3D8 backend','*.dll')])
-                    if dll:
-                        adjacent=Path(dll).with_name('dgVoodoo.conf')
-                        conf=str(adjacent) if adjacent.is_file() else filedialog.askopenfilename(title='Choose the matching dgVoodoo.conf',filetypes=[('dgVoodoo configuration','*.conf')])
-                        if conf:self.import_path(value[0],value[1],value[2],(dll,conf))
                 else:self.status.set(value);messagebox.showerror('Could not import game',value)
         except queue.Empty:pass
         if self.process is not None and self.process.poll() is not None:

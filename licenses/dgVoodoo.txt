@@ -1,0 +1,21 @@
+dgVoodoo 2.87.6, Copyright (c) 2013-2026 Dege.
+
+Unmodified MS/x86/D3D8.dll and the supplied dgVoodoo.conf are included solely
+for this dedicated LEGO Soccer Mania / Football Mania game modification.
+These vendor files are not covered by OpenSoccerMania's MIT license.
+
+The author's redistribution terms permit individual unmodified components with
+a game or game mod. Standalone redistribution requires the full original ZIP;
+general-purpose launchers/frameworks for multiple applications may not bundle it.
+OpenSoccerMania does not expose a general-purpose application wrapper service.
+
+Authoritative terms:
+https://dege.freeweb.hu/dgVoodoo2/ReadmeGeneral/#1-redistribution-rights
+Official release:
+https://github.com/dege-diosg/dgVoodoo2/releases/tag/2.87.6
+
+Original ZIP SHA-256:
+9afa493396feec7108f42a2d97661eef96bbaac5addf0dfb5cfbc3001cd76a0a
+
+The distributed vendor files retain their original bytes. Configuration changes
+are generated only in the user's private game copy, never in the bundled files.

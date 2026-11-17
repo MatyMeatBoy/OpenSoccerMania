@@ -1,0 +1,11 @@
+{
+  "version": "2.87.6",
+  "scope": "OpenSoccerMania dedicated game compatibility backend",
+  "source": "https://github.com/dege-diosg/dgVoodoo2/releases/tag/2.87.6",
+  "archiveSha256": "9afa493396feec7108f42a2d97661eef96bbaac5addf0dfb5cfbc3001cd76a0a",
+  "redistributionTerms": "https://dege.freeweb.hu/dgVoodoo2/ReadmeGeneral/#1-redistribution-rights",
+  "files": {
+    "d3d8.dll": "25a0ceeb85fcc4675c6f964442eecc14fedd504effd39c931a627249ad4685e2",
+    "dgVoodoo.conf": "45cc0eb8e6ed4f067aca1b2e4ac1268dfbd164bbbd06d264c53e8a60642c4dbf"
+  }
+}

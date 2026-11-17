@@ -18,6 +18,9 @@ MAX_IMAGE_BYTES = 4 * 1024**3
 MAX_FILES = 100000
 MAX_LIST_BYTES = 16 * 1024**2
 MAX_IMPORT_BYTES = 4 * 1024**3
+WINDOWS_DEVICES = {'CON', 'PRN', 'AUX', 'NUL', 'CLOCK$', 'CONIN$', 'CONOUT$',
+                   *(prefix + str(digit) for prefix in ('COM', 'LPT') for digit in range(10)),
+                   *(prefix + chr(digit) for prefix in ('COM', 'LPT') for digit in (0xb9, 0xb2, 0xb3))}
 
 
 def _unlinked(path):
@@ -37,6 +40,7 @@ class DiscImageProbe:
     data_path: Path | None = None
     sector_size: int = 0
     data_offset: int = 0
+    descriptor_sector: int = 16
 
 
 def _cue_data(path):
@@ -89,16 +93,21 @@ def probe_disc_image(path):
             for sector_size, offset, mode in ((2048, 0, 'MODE1/2048'), (2352, 16, 'MODE1/2352'), (2352, 24, 'MODE2/2352')):
                 if expected and expected != mode:
                     continue
-                stream.seek(16 * sector_size + offset)
-                if stream.read(7) == b'\x01CD001\x01':
-                    return DiscImageProbe(path, True, 'ISO9660 data volume (' + mode + ').', data, sector_size, offset)
+                # Boot records may precede the primary volume descriptor.
+                for sector in range(16, min(16 + 128, size // sector_size)):
+                    stream.seek(sector * sector_size + offset)
+                    header = stream.read(7)
+                    if header[1:] != b'CD001\x01' or header[:1] == b'\xff':
+                        break
+                    if header[:1] == b'\x01':
+                        return DiscImageProbe(path, True, 'ISO9660 data volume (' + mode + ').', data, sector_size, offset, sector)
         raise ValueError('No supported ISO9660 data volume found. Audio, multisession, compressed and proprietary variants need an external read-only conversion to ISO.')
     except (OSError, ValueError, UnicodeError) as error:
         return DiscImageProbe(original, False, str(error))
 
 
 @contextmanager
-def normalized_disc_image(path):
+def normalized_disc_image(path, *, deadline=None):
     """Yield a cooked ISO path. Temporary raw-sector conversions are removed."""
     probe = probe_disc_image(path)
     if not probe.supported:
@@ -110,13 +119,15 @@ def normalized_disc_image(path):
         normalized = Path(temp) / 'data.iso'
         with probe.data_path.open('rb') as source, normalized.open('xb') as target:
             # ISO volume space size bounds conversion and excludes trailing NRG metadata.
-            source.seek(16 * 2352 + probe.data_offset + 80)
+            source.seek(probe.descriptor_sector * 2352 + probe.data_offset + 80)
             lengths = source.read(8)
             count = int.from_bytes(lengths[:4], 'little')
             if count != int.from_bytes(lengths[4:], 'big') or count < 17 or count * 2352 > probe.data_path.stat().st_size:
                 raise ValueError('Invalid or truncated ISO volume size in raw image.')
             source.seek(0)
             for _ in range(count):
+                if deadline is not None and time.monotonic() > deadline:
+                    raise ValueError('Raw disc conversion exceeded its time limit.')
                 sector = source.read(2352)
                 if len(sector) != 2352 or sector[:12] != b'\x00' + b'\xff' * 10 + b'\x00' or sector[15] != (1 if probe.data_offset == 16 else 2):
                     raise ValueError('Raw image contains a damaged or unsupported sector.')
@@ -183,9 +194,9 @@ def _parse_listing(text, max_bytes):
             continue
         name = values['Path'].replace('\\', '/')
         parts = name.split('/')
-        if not name or PureWindowsPath(name).is_absolute() or any(p in ('', '.', '..') or any(c in p for c in ':<>\"|?*') or p.endswith(('.', ' ')) or p.split('.')[0].upper() in {'CON', 'PRN', 'AUX', 'NUL', *(f'COM{i}' for i in range(1, 10)), *(f'LPT{i}' for i in range(1, 10))} or any(ord(c) < 32 for c in p) for p in parts):
+        if not name or PureWindowsPath(name).is_absolute() or any(p in ('', '.', '..') or any(c in p for c in ':<>\"|?*') or p.endswith(('.', ' ')) or p.split('.')[0].rstrip(' .').upper() in WINDOWS_DEVICES or any(ord(c) < 32 for c in p) for p in parts):
             raise ValueError('Unsafe path in disc image.')
-        if any(key in values for key in ('Symbolic Link', 'Hard Link')) or 'L' in values.get('Attributes', '').split() or values.get('Mode', '').startswith('l'):
+        if any(values.get(key) for key in ('Symbolic Link', 'Hard Link')) or 'L' in values.get('Attributes', '').split() or values.get('Mode', '').startswith('l'):
             raise ValueError('Linked files are unsupported in disc images.')
         key = name.casefold()
         if key in seen:
@@ -193,7 +204,7 @@ def _parse_listing(text, max_bytes):
         seen.add(key)
         is_dir = values.get('Folder') == '+' or 'D' in values.get('Attributes', '').split()
         try:
-            size = int(values.get('Size', '0'))
+            size = int(values.get('Size') or '0')
         except ValueError:
             raise ValueError('Invalid disc file size.') from None
         if size < 0:
@@ -207,20 +218,189 @@ def _parse_listing(text, max_bytes):
     return entries
 
 
+ISO_BLOCK = 2048
+MAX_DIRECTORY_BYTES = 16 * 1024**2
+MAX_METADATA_BYTES = 64 * 1024**2
+MAX_DIRECTORY_DEPTH = 64
+
+
+def _iso_integer(data, offset, width):
+    raw = data[offset:offset + width * 2]
+    if len(raw) != width * 2 or int.from_bytes(raw[:width], 'little') != int.from_bytes(raw[width:], 'big'):
+        raise ValueError('Inconsistent or truncated ISO9660 both-endian field.')
+    return int.from_bytes(raw[:width], 'little')
+
+
+def _iso_name(name):
+    if any(ord(character) < 32 for character in name):
+        raise ValueError('Control characters are unsafe in ISO9660 identifiers.')
+    # Reuse the same Windows-safe path rules as the optional external reader.
+    _parse_listing('Path = ' + name + '\nSize = 0\nFolder = -\n', 1)
+    if '/' in name or '\\' in name:
+        raise ValueError('An ISO9660 identifier must be one safe path component.')
+    return name
+
+
+def _iso_inventory(stream, image_bytes, max_bytes, deadline):
+    """Read ISO9660/Joliet metadata before creating any output files.
+
+    Directory records follow ECMA-119; Joliet SVD names use big-endian Unicode.
+    Interleaved/multiextent/multivolume and Rock Ridge-only names fail explicitly.
+    """
+    def read_at(offset, size, bound=image_bytes):
+        if time.monotonic() > deadline:
+            raise ValueError('ISO9660 import exceeded its time limit.')
+        if offset < 0 or size < 0 or offset + size > bound:
+            raise ValueError('ISO9660 extent is outside the image/volume bounds.')
+        stream.seek(offset)
+        data = stream.read(size)
+        if len(data) != size:
+            raise ValueError('ISO9660 data is truncated.')
+        return data
+
+    primary = None; supplementary = []; terminated = False
+    for sector in range(16, 16 + 128):
+        descriptor = read_at(sector * ISO_BLOCK, ISO_BLOCK)
+        if descriptor[1:7] != b'CD001\x01':
+            raise ValueError('Invalid ISO9660 volume descriptor.')
+        if descriptor[0] == 1 and primary is None:
+            primary = descriptor
+        elif descriptor[0] == 2 and descriptor[88:91] in (b'%/@', b'%/C', b'%/E'):
+            supplementary.append(descriptor)
+        elif descriptor[0] == 255:
+            terminated = True; break
+    if primary is None or not terminated:
+        raise ValueError('ISO9660 primary descriptor or terminator is missing.')
+    count = _iso_integer(primary, 80, 4)
+    if count < 17 or count * ISO_BLOCK > image_bytes:
+        raise ValueError('ISO9660 volume size exceeds the readable image.')
+    volume_bytes = count * ISO_BLOCK
+    chosen = max(supplementary, key=lambda descriptor: descriptor[90]) if supplementary else primary
+    joliet = chosen is not primary
+    if (_iso_integer(chosen, 80, 4) != count or _iso_integer(chosen, 128, 2) != ISO_BLOCK
+            or _iso_integer(chosen, 120, 2) != 1 or _iso_integer(chosen, 124, 2) != 1):
+        raise ValueError('Unsupported ISO9660 block size or multivolume layout.')
+
+    def record(data):
+        if len(data) < 34 or data[0] != len(data) or data[32] == 0 or 33 + data[32] > len(data):
+            raise ValueError('Invalid ISO9660 directory record length.')
+        if data[1] or data[26] or data[27] or data[25] & 0xe4 or _iso_integer(data, 28, 2) != 1:
+            raise ValueError('Extended, associated, interleaved or multiextent ISO9660 records are unsupported.')
+        extent = _iso_integer(data, 2, 4); size = _iso_integer(data, 10, 4)
+        if extent * ISO_BLOCK + size > volume_bytes:
+            raise ValueError('ISO9660 extent is outside the volume bounds.')
+        name = data[33:33 + data[32]]
+        system_use = data[33 + data[32] + (data[32] % 2 == 0):]
+        # Do not silently reinterpret Rock Ridge links or truncated long names.
+        while len(system_use) >= 4 and system_use[2] >= 4 and system_use[2] <= len(system_use) and system_use[3] == 1:
+            if system_use[:2] in (b'SL', b'NM', b'CE', b'RE', b'CL', b'PL'):
+                raise ValueError('Rock Ridge links/names are unsupported; use an ISO9660/Joliet data image.')
+            system_use = system_use[system_use[2]:]
+        directory = bool(data[25] & 2)
+        if directory and (not size or size % ISO_BLOCK or size > MAX_DIRECTORY_BYTES):
+            raise ValueError('Invalid or oversized ISO9660 directory extent.')
+        return name, extent, size, directory
+
+    root_length = chosen[156]
+    root_name, root_extent, root_size, root_directory = record(chosen[156:156 + root_length])
+    if root_name != b'\0' or not root_directory:
+        raise ValueError('Invalid ISO9660 root directory.')
+    pending = [('', root_extent, root_size, 0)]
+    visited = set(); seen_names = set(); result = []; total = 0; metadata = 0
+    while pending:
+        parent, extent, length, depth = pending.pop()
+        if depth > MAX_DIRECTORY_DEPTH or extent in visited:
+            raise ValueError('ISO9660 directory cycle, alias or excessive depth.')
+        visited.add(extent); metadata += length
+        if metadata > MAX_METADATA_BYTES:
+            raise ValueError('ISO9660 directory metadata exceeds the import limit.')
+        data = read_at(extent * ISO_BLOCK, length, volume_bytes)
+        position = 0
+        while position < length:
+            if time.monotonic() > deadline:
+                raise ValueError('ISO9660 directory scan exceeded its time limit.')
+            record_length = data[position]
+            if record_length == 0:
+                boundary = min((position // ISO_BLOCK + 1) * ISO_BLOCK, length)
+                if any(data[position:boundary]):
+                    raise ValueError('Nonzero ISO9660 directory padding is invalid.')
+                position = boundary; continue
+            if position % ISO_BLOCK + record_length > ISO_BLOCK or position + record_length > length:
+                raise ValueError('ISO9660 directory record crosses a sector boundary.')
+            name, file_extent, size, directory = record(data[position:position + record_length])
+            position += record_length
+            if name in (b'\0', b'\1'):
+                if not directory:
+                    raise ValueError('Invalid ISO9660 dot directory record.')
+                continue
+            try:
+                decoded = name.decode('utf-16-be' if joliet else 'ascii')
+            except UnicodeError as error:
+                raise ValueError('Invalid ISO9660/Joliet filename encoding.') from error
+            if not directory:
+                decoded = re.sub(r';[0-9]+$', '', decoded)
+                if decoded.endswith('.'):
+                    decoded = decoded[:-1]
+            decoded = _iso_name(decoded)
+            relative = parent + '/' + decoded if parent else decoded
+            if relative.casefold() in seen_names:
+                raise ValueError('Case-colliding ISO9660 paths are unsupported.')
+            seen_names.add(relative.casefold())
+            if len(seen_names) > MAX_FILES:
+                raise ValueError('ISO9660 file count exceeds the import limit.')
+            if not directory:
+                total += size
+                if total > max_bytes:
+                    raise ValueError('ISO9660 payload exceeds the import byte limit.')
+            result.append((relative, file_extent, size, directory))
+            if directory:
+                pending.append((relative, file_extent, size, depth + 1))
+    if not result:
+        raise ValueError('ISO9660 volume contains no readable entries.')
+    return result
+
+
+def _extract_iso9660(image, tree, max_bytes, deadline):
+    with image.open('rb') as stream:
+        entries = _iso_inventory(stream, os.fstat(stream.fileno()).st_size, max_bytes, deadline)
+        for name, extent, size, directory in entries:
+            if time.monotonic() > deadline:
+                raise ValueError('ISO9660 extraction exceeded its time limit.')
+            output = tree.joinpath(*name.split('/'))
+            if directory:
+                output.mkdir(parents=True, exist_ok=True); continue
+            output.parent.mkdir(parents=True, exist_ok=True)
+            stream.seek(extent * ISO_BLOCK)
+            with output.open('xb') as target:
+                remaining = size
+                while remaining:
+                    if time.monotonic() > deadline:
+                        raise ValueError('ISO9660 extraction exceeded its time limit.')
+                    block = stream.read(min(1024**2, remaining))
+                    if not block:
+                        raise ValueError('ISO9660 file became truncated during extraction.')
+                    target.write(block); remaining -= len(block)
+
+
 @contextmanager
 def open_disc_image(path, *, extractor=None, max_bytes=MAX_IMPORT_BYTES):
     """Yield a bounded private extracted tree; delete it even when import fails.
 
-    Requires an installed 7-Zip. Each listed file is streamed to a validated path,
-    so the external tool cannot create links or choose output filesystem paths.
+    ISO9660/Joliet extraction is built in and never searches for installed tools.
+    An explicitly supplied 7-Zip executable remains an optional compatibility API.
     """
-    tool = Path(extractor) if extractor else find_7zip()
-    if tool is None or not tool.is_file():
-        raise ValueError('Install 7-Zip or provide its executable path to import this image.')
+    tool = Path(extractor) if extractor is not None else None
+    if tool is not None and not tool.is_file():
+        raise ValueError('The explicitly supplied disc extractor does not exist.')
     if not 0 < max_bytes <= MAX_IMPORT_BYTES:
         raise ValueError('Invalid import byte limit.')
-    with normalized_disc_image(path) as image, tempfile.TemporaryDirectory(prefix='opensoccermania-extract-') as temp:
+    deadline = time.monotonic() + 300
+    with normalized_disc_image(path, deadline=deadline) as image, tempfile.TemporaryDirectory(prefix='opensoccermania-extract-') as temp:
         base = Path(temp); listing = base / 'listing.txt'; tree = base / 'disc'; tree.mkdir()
+        if tool is None:
+            _extract_iso9660(image, tree, max_bytes, deadline)
+            yield tree
+            return
         _run_bounded([tool, 'l', '-slt', '-ba', '-sccUTF-8', '--', image], listing, MAX_LIST_BYTES)
         entries = _parse_listing(listing.read_text(encoding='utf-8-sig'), max_bytes)
         for name, size, is_dir in entries:

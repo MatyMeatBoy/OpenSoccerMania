@@ -176,8 +176,7 @@ static void capture_backbuffer(IDirect3DDevice8* device,const char* tag="frame")
     FILE* file=std::fopen(log_path,"a");if(file){std::fprintf(file,"FRAME_CAPTURE result=0x%lx dimensions=%ux%u format=%u\n",static_cast<unsigned long>(status),desc.Width,desc.Height,desc.Format);std::fclose(file);}
 }
 static bool background_running=true;
-static WNDPROC original_window_proc=nullptr;
-static HWND subclassed_window=nullptr;
+static std::unordered_map<HWND,WNDPROC> window_downstreams;
 static WNDPROC original_legacy_proc=nullptr;
 static WINDOWPLACEMENT saved_window_placement={};
 static bool have_window_placement=false;
@@ -219,7 +218,11 @@ static LRESULT CALLBACK game_proc(HWND window,UINT message,WPARAM wparam,LPARAM 
         FILE* file=std::fopen(log_path,"a");if(file){std::fprintf(file,"BACKGROUND continue message=0x%x input_capture=released\n",message);std::fclose(file);}
         return 0;
     }
-    return original_window_proc?CallWindowProcA(original_window_proc,window,message,wparam,lparam):DefWindowProcA(window,message,wparam,lparam);
+    const auto found=window_downstreams.find(window);
+    const WNDPROC downstream=found==window_downstreams.end()?nullptr:found->second;
+    const auto result=downstream?CallWindowProcA(downstream,window,message,wparam,lparam):DefWindowProcA(window,message,wparam,lparam);
+    if(message==WM_NCDESTROY){window_downstreams.erase(window);if(game_window==window)game_window=nullptr;}
+    return result;
 }
 static SHORT (WINAPI *original_async_key)(int)=nullptr;
 static osm::PrivateKeyboard private_keyboard;
@@ -375,6 +378,28 @@ static void window_parameters(D3DPRESENT_PARAMETERS* params) {
     params->FullScreen_PresentationInterval=D3DPRESENT_INTERVAL_DEFAULT;
 }
 
+static void install_window_hooks(HWND window) {
+    if(display_mode==2||!window||window_downstreams.count(window))return;
+    const auto procedure=reinterpret_cast<void*>(GetClassLongPtrA(window,GCLP_WNDPROC));
+    const auto base=reinterpret_cast<unsigned char*>(GetModuleHandleA(nullptr));
+    const auto dos=reinterpret_cast<IMAGE_DOS_HEADER*>(base);
+    const auto headers=reinterpret_cast<IMAGE_NT_HEADERS*>(base+dos->e_lfanew);
+    const auto address=reinterpret_cast<ULONG_PTR>(procedure),begin=reinterpret_cast<ULONG_PTR>(base);
+    if(!original_legacy_proc&&address>=begin&&address<begin+headers->OptionalHeader.SizeOfImage) {
+        const auto created=MH_CreateHook(procedure,reinterpret_cast<void*>(legacy_proc),reinterpret_cast<void**>(&original_legacy_proc));
+        if(created==MH_OK)MH_EnableHook(procedure);
+    }
+    // Install below the backend before its first CreateDevice. Later backend
+    // wrappers may retain this callback; never capture them as our downstream.
+    const auto current=reinterpret_cast<WNDPROC>(GetWindowLongPtrA(window,GWLP_WNDPROC));
+    if(!current||current==game_proc)return;
+    window_downstreams.emplace(window,current);
+    SetLastError(0);
+    const auto previous=SetWindowLongPtrA(window,GWLP_WNDPROC,reinterpret_cast<LONG_PTR>(game_proc));
+    if(!previous&&GetLastError()){window_downstreams.erase(window);return;}
+    window_downstreams[window]=reinterpret_cast<WNDPROC>(previous);
+    FILE* file=std::fopen(log_path,"a");if(file){std::fprintf(file,"WINDOW class_proc=%p resize_owner=backend legacy_hook=%d downstream=%p\n",procedure,original_legacy_proc!=nullptr,reinterpret_cast<void*>(previous));std::fclose(file);}
+}
 static void window_appearance(HWND window) {
     if(display_mode==2 || !window)return;
     MONITORINFO monitor={};monitor.cbSize=sizeof(monitor);
@@ -397,20 +422,6 @@ static void window_appearance(HWND window) {
     }
     SetWindowPos(window,HWND_NOTOPMOST,rect.left,rect.top,rect.right-rect.left,rect.bottom-rect.top,SWP_FRAMECHANGED|SWP_NOACTIVATE);
     ClipCursor(nullptr);ReleaseCapture();
-    if(subclassed_window!=window||GetWindowLongPtrA(window,GWLP_WNDPROC)!=reinterpret_cast<LONG_PTR>(game_proc)) {
-        const auto procedure=reinterpret_cast<void*>(GetClassLongPtrA(window,GCLP_WNDPROC));
-        const auto base=reinterpret_cast<unsigned char*>(GetModuleHandleA(nullptr));
-        const auto dos=reinterpret_cast<IMAGE_DOS_HEADER*>(base);
-        const auto headers=reinterpret_cast<IMAGE_NT_HEADERS*>(base+dos->e_lfanew);
-        const auto address=reinterpret_cast<ULONG_PTR>(procedure),begin=reinterpret_cast<ULONG_PTR>(base);
-        if(!original_legacy_proc && address>=begin && address<begin+headers->OptionalHeader.SizeOfImage) {
-            const auto created=MH_CreateHook(procedure,reinterpret_cast<void*>(legacy_proc),reinterpret_cast<void**>(&original_legacy_proc));
-            if(created==MH_OK)MH_EnableHook(procedure);
-        }
-        FILE* file=std::fopen(log_path,"a");if(file){std::fprintf(file,"WINDOW class_proc=%p resize_owner=backend legacy_hook=%d\n",procedure,original_legacy_proc!=nullptr);std::fclose(file);}
-        original_window_proc=reinterpret_cast<WNDPROC>(SetWindowLongPtrA(window,GWLP_WNDPROC,reinterpret_cast<LONG_PTR>(game_proc)));
-        subclassed_window=window;
-    }
 }
 
 static void toggle_borderless(HWND window) {
@@ -441,6 +452,7 @@ static HRESULT WINAPI reset(IDirect3DDevice8* device,D3DPRESENT_PARAMETERS* para
     settings_menu.release(device);
     physical_backbuffer=nullptr;
     if(!params)return D3DERR_INVALIDCALL;
+    install_window_hooks(params->hDeviceWindow?params->hDeviceWindow:game_window);
     D3DPRESENT_PARAMETERS physical=*params;window_parameters(&physical);render_parameters(physical,*params);
     const HRESULT result=real_reset(device,&physical);
     FILE* file=std::fopen(log_path,"a");if(file){std::fprintf(file,"RESET result=0x%lx size=%ux%u windowed=%d\n",static_cast<unsigned long>(result),physical.BackBufferWidth,physical.BackBufferHeight,physical.Windowed);std::fclose(file);}
@@ -968,6 +980,7 @@ static HRESULT WINAPI present(IDirect3DDevice8* device,const RECT* source,const 
 
 static HRESULT WINAPI create_device(IDirect3D8* api,UINT adapter,D3DDEVTYPE type,HWND window,DWORD behavior,D3DPRESENT_PARAMETERS* params,IDirect3DDevice8** result) {
     if(!params)return D3DERR_INVALIDCALL;
+    install_window_hooks(params->hDeviceWindow?params->hDeviceWindow:window);
     D3DPRESENT_PARAMETERS physical=*params;window_parameters(&physical);render_parameters(physical,*params);
     if(display_mode!=2) {
         D3DDISPLAYMODE desktop={};

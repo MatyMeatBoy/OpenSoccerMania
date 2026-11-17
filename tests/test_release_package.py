@@ -7,7 +7,7 @@ import tempfile
 import unittest
 import zipfile
 from unittest.mock import patch
-from tools.package_release import package_release
+from tools.package_release import package_release, VENDOR_FILES, VENDOR_LICENSE
 
 
 def git(repo, *arguments):
@@ -56,8 +56,34 @@ class ReleasePackageTests(unittest.TestCase):
                 package_release(repo, revision, first.path, '0.1.0-pre.2')
             self.assertEqual(first.sha256, hashlib.sha256(first.path.read_bytes()).hexdigest())
 
+    def test_pinned_vendor_release_accepts_exact_bundle_only(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); repo = root / 'repo'; repo.mkdir(); fixture(repo)
+            (repo / '.gitattributes').write_text('runtime/graphics/dgVoodoo/* -text\n')
+            for name in VENDOR_FILES:
+                path = repo / name; path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes((Path(__file__).resolve().parents[1] / name).read_bytes())
+            path = repo / VENDOR_LICENSE; path.parent.mkdir(parents=True, exist_ok=True); path.write_text('vendor license fixture')
+            git(repo, 'add', '.')
+            git(repo, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'approved vendor')
+            revision = git(repo, 'rev-parse', 'HEAD')
+            result = package_release(repo, revision, root / 'valid.zip', '0.1.0-pre.3')
+            self.assertTrue(result.path.is_file())
+            for index, name in enumerate(VENDOR_FILES):
+                path = repo / name; original = path.read_bytes()
+                path.write_bytes(original + b'tamper');git(repo, 'add', name)
+                git(repo, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'tampered vendor')
+                with self.assertRaisesRegex(ValueError, 'vendor hash'):
+                    package_release(repo, git(repo, 'rev-parse', 'HEAD'), root / f'tampered{index}.zip', '0.1.0-pre.3')
+                path.write_bytes(original)
+                git(repo, 'add', name)
+            (repo / next(iter(VENDOR_FILES))).unlink();git(repo, 'add', '-u')
+            git(repo, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'missing vendor')
+            with self.assertRaisesRegex(ValueError, 'all pinned'):
+                package_release(repo, git(repo, 'rev-parse', 'HEAD'), root / 'missing.zip', '0.1.0-pre.3')
+
     def test_tracked_private_or_wrapper_files_refuse_package(self):
-        for bad in ('local/Game.exe', 'assets/Game.exe', 'runtime/d3d8.dll', 'local/capture.png', 'build/bridge.dll', 'ElectronicArts-LegoSoccerMania/README.md', 'assets/disc.iso'):
+        for bad in ('local/Game.exe', 'assets/Game.exe', 'runtime/d3d8.dll', 'local/capture.png', 'build/bridge.dll', 'ElectronicArts-LegoSoccerMania/README.md', 'assets/disc.iso', 'runtime/graphics/dgVoodoo/d3d9.dll', 'runtime/graphics/dgVoodoo/private.dll'):
             with self.subTest(path=bad), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp); repo = root / 'repo'; repo.mkdir(); fixture(repo)
                 path = repo / bad; path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(b'private fixture')

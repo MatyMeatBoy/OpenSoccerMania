@@ -1,4 +1,4 @@
-"""Safe reuse of an owner-supplied graphics backend between private imports."""
+"""Provision the dedicated bundled graphics backend into private game imports."""
 from pathlib import Path
 import hashlib
 import os
@@ -9,6 +9,59 @@ from .disc_images import _unlinked
 MAX_DLL_BYTES = 32 * 1024**2
 MAX_CONF_BYTES = 1024**2
 MAX_LIBRARY_ENTRIES = 200
+BUNDLED_BACKEND_HASHES = {
+    'd3d8.dll': '25a0ceeb85fcc4675c6f964442eecc14fedd504effd39c931a627249ad4685e2',
+    'dgVoodoo.conf': '45cc0eb8e6ed4f067aca1b2e4ac1268dfbd164bbbd06d264c53e8a60642c4dbf',
+}
+
+
+def bundled_backend(root):
+    folder = Path(root) / 'runtime/graphics/dgVoodoo'
+    try:
+        for name, digest in BUNDLED_BACKEND_HASHES.items():
+            raw = _read_file(folder / name, MAX_DLL_BYTES if name.endswith('.dll') else MAX_CONF_BYTES)
+            if hashlib.sha256(raw).hexdigest() != digest:
+                raise ValueError('Bundled graphics dependency checksum mismatch.')
+        _validate_backend(_read_file(folder / 'd3d8.dll', MAX_DLL_BYTES))
+    except (OSError, ValueError) as error:
+        raise ValueError('The OpenSoccerMania package is incomplete or damaged. Extract the complete portable ZIP again; no separate graphics download is required.') from error
+    return folder / 'd3d8.dll', folder / 'dgVoodoo.conf'
+
+
+def ensure_backend(entry, root):
+    """Fill missing private graphics files from the pack, without component dialogs."""
+    entry = _unlinked(entry)
+    _read_file(_named(entry, 'opensoccermania-source.json'), MAX_CONF_BYTES)
+    dll = _named(entry, 'd3d8.dll'); conf = _named(entry, 'dgVoodoo.conf')
+    marker = _named(entry, 'opensoccermania-bridge.sha256')
+    if dll.exists():
+        actual = _named(entry, 'd3d8_backend.dll') if marker.exists() and _owned_bridge(entry) else dll
+        try:
+            _validate_backend(_read_file(actual, MAX_DLL_BYTES))
+        except (OSError, ValueError) as error:
+            raise ValueError('This private entry has an unrecognized graphics setup; existing files were preserved. Import a clean game ISO or folder to rebuild it automatically.') from error
+        if conf.exists():
+            _read_file(conf, MAX_CONF_BYTES)
+            return False
+    elif marker.exists() or _named(entry, 'd3d8_backend.dll').exists():
+        raise ValueError('This private graphics installation is incomplete. Import a clean game ISO or folder to rebuild it automatically.')
+    supplied = bundled_backend(root)
+    if not dll.exists() and not conf.exists():
+        return install_backend(entry, *supplied)
+    # Complete a partial import with only missing files; never replace a file
+    # already present in the private entry or touch the source installation.
+    for target, source in ((dll, supplied[0]), (conf, supplied[1])):
+        if target.exists():
+            continue
+        with tempfile.NamedTemporaryFile(prefix='.graphics-', dir=entry, delete=False) as stream:
+            staged = Path(stream.name)
+            stream.write(_read_file(source, MAX_DLL_BYTES if source.suffix == '.dll' else MAX_CONF_BYTES))
+            stream.flush(); os.fsync(stream.fileno())
+        try:
+            os.link(staged, target)
+        finally:
+            staged.unlink(missing_ok=True)
+    return True
 
 
 def _named(folder, name):
@@ -93,7 +146,7 @@ def _validate_backend(raw):
         raise ValueError('Select a real graphics backend, not the OpenSoccerMania bridge.')
     # Conservative vendor evidence, not a security signature or DLL trust proof.
     if not any(value in lowered for value in (b'dgvoodoo', 'dgvoodoo'.encode('utf-16le'))):
-        raise ValueError('Only owner-supplied dgVoodoo backends are recognized.')
+        raise ValueError('Only recognized dgVoodoo graphics backends are supported.')
 
 
 def _owned_bridge(entry):

@@ -2,6 +2,8 @@ import tempfile
 import unittest
 import hashlib
 import sys
+import os
+from unittest.mock import patch
 from pathlib import Path
 from opensoccermania import disc_images
 
@@ -112,13 +114,24 @@ class DiscImageTests(unittest.TestCase):
                 cue.write_text(text)
                 self.assertFalse(disc_images.probe_disc_image(cue).supported)
 
+    def test_default_import_needs_no_installed_tool_or_process(self):
+        with tempfile.TemporaryDirectory() as temp:
+            image = Path(temp) / 'clean machine.iso'; image.write_bytes(small_iso())
+            before = hashlib.sha256(image.read_bytes()).hexdigest()
+            with patch.dict(os.environ, {'PATH': ''}), patch.object(disc_images, 'find_7zip', side_effect=AssertionError('No installed extractor allowed')), patch.object(disc_images.subprocess, 'Popen', side_effect=AssertionError('No external process allowed')):
+                with disc_images.open_disc_image(image) as extracted:
+                    self.assertEqual((extracted / 'GAME.EXE').read_bytes(), b'MZsynthetic fixture')
+                    saved = extracted
+            self.assertFalse(saved.exists())
+            self.assertEqual(hashlib.sha256(image.read_bytes()).hexdigest(), before)
+
     @unittest.skipUnless(disc_images.find_7zip(), '7-Zip is an optional import dependency.')
     def test_installed_extractor_private_tree_and_cleanup(self):
         with tempfile.TemporaryDirectory() as temp:
             image = Path(temp) / 'owner image.iso'
             image.write_bytes(small_iso())
             original_hash = hashlib.sha256(image.read_bytes()).hexdigest()
-            with disc_images.open_disc_image(image) as extracted:
+            with disc_images.open_disc_image(image, extractor=disc_images.find_7zip()) as extracted:
                 self.assertEqual((extracted / 'GAME.EXE').read_bytes(), b'MZsynthetic fixture')
                 saved = extracted
             self.assertFalse(saved.exists())

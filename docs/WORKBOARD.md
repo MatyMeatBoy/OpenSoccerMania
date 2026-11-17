@@ -1,7 +1,19 @@
 # OpenSoccerMania work board
 
-Updated: 2026-11-16. The 0.1.0-pre.2 delivery adds a Windows portable launcher
-alongside inventoried source. See [scope and limits](releases/0.1.0-pre.2.md).
+Updated: 2026-11-16. Pre.3 fixes clean-PC dependency provisioning and includes an
+ISO9660/Joliet reader. See [scope and limits](releases/0.1.0-pre.3.md).
+
+## Clean-PC packaging correction
+
+- Pre.2 omitted the backend and default configuration, incorrectly relying on
+  a preexisting private-library donor. The new pack includes exact pinned vendor
+  components for this dedicated game and provisions them automatically.
+- The default image reader uses no installed tools. Empty-library ISO import
+  regression tests disable Windows mounting and forbid external processes.
+- Frozen smoke coverage now includes a synthetic ISO import and graphics profile
+  save, rather than only opening pages. Original game assets are not in fixtures.
+- Vendor binary/configuration bytes are preserved with Git binary attributes and
+  PyInstaller's no-UPX build, with source/portable hash and license checks.
 
 ## Current pass: original clock and independent rendering
 

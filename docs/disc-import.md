@@ -25,14 +25,13 @@ import if a sector, filesystem entry or extraction is damaged. This is deliberat
 not a universal converter. Unsupported variants should be converted with an
 owner-chosen read-only disc utility to a separate ISO; retain the original dump.
 
-`open_disc_image(path, extractor=None, max_bytes=4 * 1024**3)` is a context manager
-that yields a temporary extracted directory. It requires an installed
-[7-Zip](https://www.7-zip.org/), whose official supported formats include ISO and
-UDF. The importer finds `7zz`/`7z` on PATH or the Windows Program Files installation;
-an explicit executable path may also be supplied. Nothing is downloaded or
-installed automatically. The tested local dependency was the installed Windows
-7-Zip command-line executable. Existing `sources.mounted_iso()` remains available
-for Windows read-only ISO mounting without 7-Zip.
+`open_disc_image(path, extractor=None, max_bytes=4 * 1024**3)` yields a temporary
+extracted directory using the included ISO9660/Joliet reader. Normal imports do
+not search PATH, require installed utilities, start an extractor process or
+perform a network download. A developer may explicitly pass an extractor for
+comparison, but that optional path is not required by the portable launcher.
+Windows read-only mounting remains a separate developer API; normal launcher
+imports always use the included reader without mounting or shell commands.
 
 ```python
 from opensoccermania.disc_images import open_disc_image, probe_disc_image
@@ -50,18 +49,13 @@ with open_disc_image(owner_selected_image) as extracted_root:
 Raw conversion uses the ISO volume size and validates every copied sector's sync,
 mode and MODE2 subheader. It does not rewrite the image or use a virtual drive.
 [ECMA-130](https://ecma-international.org/publications-and-standards/standards/ecma-130/)
-describes CD-ROM sector structures. Extraction lists entries first and streams each
-file through stdout to a validated destination; 7-Zip cannot select filesystem
-output paths or create links. Path traversal, Windows device/stream names, case
-collisions, listed links, symlinks and Windows reparse points are rejected.
-
-Image files and total extracted payload are limited to 4 GiB, listings to 16 MiB,
-entries to 100,000, and each extractor process to 120 seconds. Stdout is streamed
-with an exact byte cap; a watchdog terminates timed-out processes. Extraction uses
-hidden subprocesses without prompts or desktop interaction. Staging is removed on
-success or failure. Selected sources should remain unchanged by other programs
-while an import is running; this is not a filesystem snapshot or an adversarial
-concurrent-writer sandbox.
+describes CD-ROM sector structures. The built-in reader validates volume and
+directory records, both-endian fields, extents, recursion/count/byte limits,
+Joliet names, path/device names, collisions and unsupported link/record forms.
+Sources remain read-only; temporary output is removed on success or failure.
+The optional explicitly selected external-extractor path retains its bounded
+stdout, watchdog and validated destination behavior. It is never selected
+implicitly for a normal portable import.
 
 ## Asset-only copies and explicit private repair
 
@@ -90,7 +84,7 @@ regional assets and another executable does not establish language, save-file or
 hook compatibility; the donor executable's exact hash still determines runtime
 support. No proprietary game files belong in the public repository.
 
-## Reusing an owner-supplied graphics backend
+## Included graphics runtime and legacy backend APIs
 
 `opensoccermania.backends.find_library_backend(library_root)` returns a `(dll, conf)`
 path pair, or `None`. It inspects at most 200 immediate entries, each requiring the
@@ -119,22 +113,15 @@ newly published files are rolled back if publication fails. This requires a
 filesystem supporting hard links. The two-file operation is rollback-safe for
 reported errors; it is not a crash-consistent filesystem transaction.
 
-No backend is bundled, downloaded, or copied from an unselected original game
-folder. Discovery uses existing owner-provided private library copies only.
-The DLL and configuration source bytes are preserved. No global Windows graphics
-configuration or original installation is changed.
-
-The launcher now performs this backend check inside its import worker, before
-portable setup and before presenting the import as ready. A source without a
-wrapper/configuration pair reuses a recognized backend from the private library.
-If no donor exists, the launcher asks for the owner's x86 dgVoodoo D3D8.dll and its
-matching configuration; it uses an adjacent dgVoodoo.conf when present. Cancelling
-leaves the copied private entry available for a later retry. No installer or
-backend is fetched. An incomplete existing graphics setup receives an actionable
-error and its files remain unchanged. Headless tests exercise automatic reuse,
-explicit selection, missing-backend handling and preservation; no GUI is opened
-by these tests. An optional local test also validates/copies the actual private
-owner backend into a disposable directory and checks source hashes afterward.
+Since pre.3 the launcher uses `bundled_backend(root)` and `ensure_backend(entry,
+root)`: exact pinned dgVoodoo 2.87.6 files from the dedicated game pack provision
+new private imports automatically. Existing complete graphics setups remain
+preserved, and missing private files can be filled without a component dialog.
+There is no library-donor dependency on a fresh PC. Missing/damaged package files
+report a full portable re-extraction, not a separate DLL/configuration download.
+Vendor originals in the pack remain unmodified; only private copies receive
+selected graphics settings. Legacy `find_library_backend`/`install_backend` APIs
+remain for compatibility and developer checks, not a required user workflow.
 
 ## Actual owner-provided folder checks for pre.2
 
@@ -152,7 +139,7 @@ was launched. The private evidence summary is retained outside Git at
 | Lego Football Mania Dutch | Intact root executable. | Its complete supplied wrapper/configuration pair was preserved and validated. |
 
 All three entries exposed nine text languages and eight voice folders. Both title
-brands decoded at 640 × 480. Their configured edition/language, supported patched
+brands decoded at 640 Ã— 480. Their configured edition/language, supported patched
 executable hash, native/input bridge copies and profile settings passed the check.
 All 62 protected original/backend file hashes matched afterward, and every
 disposable entry was removed. These results establish import and profile setup for

@@ -32,14 +32,16 @@ OpenSoccerMania gives your own game files a new desktop launcher and an incremen
 
 ## Getting started
 
-**Current prerelease: 0.1.0-pre.2 — experimental Windows portable launcher and source.**
-See [scope and verification](docs/releases/0.1.0-pre.2.md).
+**Current prerelease: 0.1.0-pre.3 — self-contained Windows portable launcher and source.**
+See [scope and verification](docs/releases/0.1.0-pre.3.md).
 
 For the portable build, download the Windows portable ZIP from
-[the release page](https://github.com/MatyMeatBoy/OpenSoccerMania/releases/tag/v0.1.0-pre.2),
+[the release page](https://github.com/MatyMeatBoy/OpenSoccerMania/releases/tag/v0.1.0-pre.3),
 extract the entire folder to a writable location, and run `OpenSoccerMania.exe`.
 Keep its accompanying files. The launcher includes Python and its dependencies;
-you still supply your own game files and graphics backend. This build targets
+you supply only your own valid game ISO or game folder. The graphics backend,
+default configuration and supported ISO reader are included; no separate
+dgVoodoo or 7-Zip installation is needed. This build targets
 Windows x64; the original game and compatibility bridges remain x86.
 
 For development from source:
@@ -64,16 +66,16 @@ Then run `.venv\Scripts\python -m opensoccermania.launcher`. Python 3.11 with Tk
 Choose **a folder** containing an extracted disc or installed game, or choose
 **a disc image**. The launcher imports into `local/library/`; your source remains
 unchanged. Image support is detected from content, including bounded single-track
-raw layouts and restricted CUE files. Extraction requires 7-Zip when read-only
-Windows mounting is unavailable. Damaged or zero-filled executables require a
+raw layouts and restricted CUE files. Supported images use the included ISO9660/Joliet
+reader. Damaged or zero-filled executables require a
 supported executable donor; usable assets are retained in the private import.
 
-The current graphics path requires dgVoodoo's x86 D3D8 wrapper and configuration.
-Imports reuse a validated owner-supplied backend already in the private library,
-or ask for its DLL/configuration. The bridge preserves that wrapper as
-`d3d8_backend.dll`. Obtain dgVoodoo from its
-[official site](https://dege.freeweb.hu/dgVoodoo2/). Existing unknown graphics or
-input DLLs are never silently overwritten.
+The portable includes an unmodified dgVoodoo 2.87.6 x86 backend and its default
+configuration for this specific game modification. Imports install them into the
+private game copy automatically, including on a fresh PC with an empty library.
+The bridge preserves its backend as `d3d8_backend.dll`. Existing unknown graphics
+or input DLLs are never silently overwritten. No graphics-component file picker
+or separate download is part of the normal import flow.
 
 ## Graphics
 
