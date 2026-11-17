@@ -5,6 +5,16 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.6. See
 
 ## Continuation verification, 2026-11-17
 
+- Four-pad real-game acceptance remains open. A private producer selects the
+  SDL-four-device route, but isolated-desktop focus inspection reports no
+  foreground window. `VirtualPad::sample` requires foreground ownership for
+  foreground-cooperative devices, unlike the explicit private keyboard diagnostic
+  path. The stopped probe therefore does not accept four-seat assignment or
+  establish a normal foreground input defect. Its corrected producer maintains
+  the required heartbeat; the earlier one-shot producer is excluded. Both owned
+  probes close cleanly; the fresh probe preserves copied save hashes. Evidence:
+  `local/acceptance-2026-11-17/four-pad-fresh-pre6/summary.json`.
+  Next: default-deny diagnostic ownership checks, then actual four-seat tests.
 - A fresh Western Junction game now passes an observed goal/replay return
   after resize / minimize / restore. Captures show the 1-0 goal (18), low-angle
   replay with sky, net and effects (19), kickoff after Continue (20), and moving
