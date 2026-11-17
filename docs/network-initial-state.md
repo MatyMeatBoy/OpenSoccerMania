@@ -170,3 +170,30 @@ words in the conditional 16-byte component, its uncaptured flag and the distinct
 inline RNG remain unresolved. Private receipts are
 `local/netplay-initial-2026-11-17/remaining-reference-provenance.json` and fresh
 instruction disassembly; arithmetic/alias checks also use both captured pairs.
+
+## Follow-up: owned buffers and conditional flag
+
+A second controlled Friendly pair (`c`, `d`) records the conditional flag before
+and after every original component callback. It is 1 in both processes. Thus
+`0x453200` takes its copying branch in this pair; its two changed bytes cannot
+be classified as an unwritten destination merely from the earlier conditional
+code inspection. The field meaning remains unresolved. The prior `a`/`b2` pair
+still has no recorded flag and is not retroactively assigned one.
+
+The same source-copy probe follows the ten identified owned-buffer fields for
+each of 13 actors. Resource metadata reports 19 bones; all 130 regions per
+process pass bounded committed/readable memory checks. Their recorded lengths
+sum to 22932 bytes per process, and all 130 corresponding buffer byte spans
+match. This does not prove all bytes were initialized, logically necessary or
+covered by original replay serialization, nor compare complete resource graphs.
+The independent inline RNG still differs (1224663864 / 1223669931).
+
+Both frame-zero aggregates still contain 18 contiguous components totaling
+28604 bytes with seed/shared RNG 999 and six controls. Both private processes
+close with exit zero, input desktop unchanged and copied save hashes identical.
+Private receipts are `local/netplay-initial-owned-2026-11-17/owned-comparison.json`,
+its capture reports/verifiers and source-copy DLL; phase captures are under
+`local/acceptance-2026-11-17/network-initial-owned-c/` and `network-initial-owned-d/`.
+No production input, seeds or scheduler behavior changes. Investigation of the
+copied conditional fields, stable reference identities and RNG ownership remains
+necessary before initial logical equivalence can be accepted.

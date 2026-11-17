@@ -5,6 +5,16 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.7. See
 
 ## Continuation verification, 2026-11-17
 
+- A second controlled Friendly pair captures flag 1 around all component calls:
+  the 16-byte conditional serializer really copies in this pair, so its remaining
+  changed words cannot simply be called padding. All 130 corresponding owned
+  actor buffers (22932 bytes per process) match; complete resource/state coverage
+  and independent RNG remain open. Both probes close cleanly with saves/input
+  desktop unchanged. See [owned-buffer follow-up](network-initial-state.md#follow-up-owned-buffers-and-conditional-flag).
+- Latest user priority adds glossy Xbox 360-style prompts plus PS4 and Switch Pro
+  families, with matching controller-scheme labels and compatibility. Asset and
+  licensing research is underway; existing broader game/network requirements
+  remain active.
 - Resolved the remaining 26 changed actor words and 19 global/team words through
   descriptor copies, team-array references and dereferenced player contexts.
   All 214 words sharing the allocation-like delta now have reference provenance;
