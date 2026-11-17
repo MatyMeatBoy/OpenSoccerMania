@@ -86,3 +86,44 @@ masking unexplained differences. Matching frame-zero state is still unproven;
 per-update confirmed input, cross-process step results, scheduler waiting and
 recovery remain required before playable online synchronization can be accepted.
 Production native code and the published pre.7 baseline are unchanged.
+
+## Follow-up: changed actor reference provenance
+
+Fresh constructor, initialization, cleanup and use-site inspection identifies
+reference semantics for 13 of the 15 changed offsets in each observed actor
+chunk. This is stronger evidence than the common arithmetic relocation delta:
+
+| Actor field offsets | Inspected provenance |
+| --- | --- |
+| `0x28` | Resource argument stored at `0x559905`; the next instructions dereference that argument to obtain the reference below. |
+| `0x2c` | Resource-derived reference stored at `0x559913`, then dereferenced by the actor serializer helper at `0x559bc0..0x559bc7`. |
+| `0xd4`, `0x14c`, `0x1cc` | Nested block `+0x68`: allocator result stored at `0x559833`, then passed to the allocator's release entry during actor cleanup. |
+| `0xdc`, `0x154`, `0x1d4` | Nested block `+0x70`: allocator result stored at `0x559852`, with matching cleanup release paths. |
+| `0xe0`, `0x158`, `0x1d8` | Nested block `+0x74`: allocator result stored at `0x55980c`, with matching cleanup release paths. |
+| `0x15c` | Separately allocated 24-byte buffer stored at `0x5597ca` and released through the cleanup path at `0x559af5`. |
+| `0x204` | Copy of reference `+0x2c` at `0x55a776..0x55a779`. |
+
+Constructor `0x559770` passes the actor's nested bases `+0x6c`, `+0xe4` and
+`+0x164` to the same allocation helper `0x5597e0`. Adding the nested field
+offsets produces the nine corresponding actor offsets above. Cleanup
+`0x559a20` loads each owned buffer, checks it for null, and passes it to the
+allocator object's `+4` release entry. These field values are references,
+not scalar gameplay quantities to compare as raw addresses. The captured
+`+0x2c` and `+0x204` values are also nonnull and equal in all 13 actor chunks
+of both accepted runs, matching the inspected alias assignment.
+
+The classified offsets account for 169 of the 195 changed actor words in this
+pair. Changed actor offsets `0xd0` and `0x148` still need their own provenance
+and referent identity; the three changed global-header references and sixteen
+changed team-component words also remain to be audited. This is not a complete
+pointer inventory: equal/null reference fields can exist outside the changed
+set. No capture bytes are altered or masked by this classification.
+
+A portable state representation must replace verified references with stable
+identities and account for their relevant contents, lifetime, aliases and null
+values. Simply dropping the 169 typed words would not prove logical equality or
+produce a valid restore format. The conditional flag and distinct inline RNG
+requirements above remain open. Private static receipts are
+`local/netplay-initial-2026-11-17/actor-reference-provenance.json` and its fresh
+disassembly; selected instruction anchors and release paths are checked against
+the supported owner executable. Production code and seeds remain unchanged.

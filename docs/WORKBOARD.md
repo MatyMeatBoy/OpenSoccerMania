@@ -5,6 +5,14 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.7. See
 
 ## Continuation verification, 2026-11-17
 
+- Traced changed actor words to constructor/cleanup/use-site reference semantics:
+  13 field offsets per actor, accounting for 169 of 195 changed actor words in
+  the controlled pair, are resource references or owned allocator buffers.
+  Two changed actor fields plus global/team reference candidates still need
+  provenance; stable IDs, referent contents and a complete pointer schema are
+  not established. No bytes are masked and no logical equality is accepted.
+  See [reference provenance](network-initial-state.md#follow-up-changed-actor-reference-provenance)
+  and `local/netplay-initial-2026-11-17/actor-reference-provenance.json`.
 - Captured the first original bucket-0 state in two fresh, phase-verified Friendly
   setups: LEGO All Stars/Lawbringers, Western Junction, identical profile/options
   copies and four pads. All 18 component spans concatenate exactly to 28604 bytes
