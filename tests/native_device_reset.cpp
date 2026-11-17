@@ -20,16 +20,32 @@ int main(){
         check(desc.Width==width&&desc.Height==height,"Reset must restore logical backbuffer identity before the game queries its current target");
     };
     logical_target(640,480);
+    check(device->Reset(nullptr)==D3DERR_INVALIDCALL,"Null reset parameters are rejected");
+    logical_target(640,480);
     const unsigned sizes[][2]={{640,480},{1280,720},{1024,768},{640,480}};
     for(const auto& size:sizes){
+        // Invalid color-buffer formats must fail without preventing a later
+        // valid reset. Do not issue draw/state calls while the device is lost.
+        D3DPRESENT_PARAMETERS invalid=params;
+        invalid.BackBufferWidth=800;invalid.BackBufferHeight=600;
+        invalid.BackBufferFormat=D3DFMT_INDEX16;
+        check(FAILED(device->Reset(&invalid)),"Reject invalid reset before retry");
         params.BackBufferWidth=size[0];params.BackBufferHeight=size[1];
         check(SUCCEEDED(device->Reset(&params)),"Reset device");
         logical_target(size[0],size[1]);
         D3DVIEWPORT8 viewport={};check(SUCCEEDED(device->GetViewport(&viewport)),"Viewport after reset");
         check(viewport.X==0&&viewport.Y==0&&viewport.Width==size[0]&&viewport.Height==size[1],"Reset restores full logical viewport");
         check(SUCCEEDED(device->Clear(0,nullptr,D3DCLEAR_TARGET,0xff123456,1,0)),"Clear after reset");
+        IDirect3DSurface8 *back=nullptr,*copy=nullptr;
+        check(SUCCEEDED(device->GetBackBuffer(0,D3DBACKBUFFER_TYPE_MONO,&back)),"Recovered backbuffer");
+        check(SUCCEEDED(device->CreateImageSurface(1920,1080,D3DFMT_X8R8G8B8,&copy)),"Recovered output readback");
+        check(SUCCEEDED(device->CopyRects(back,nullptr,0,copy,nullptr)),"Copy recovered output");
+        D3DLOCKED_RECT pixels={};check(SUCCEEDED(copy->LockRect(&pixels,nullptr,D3DLOCK_READONLY)),"Read recovered output");
+        const auto* center=reinterpret_cast<const DWORD*>(static_cast<const BYTE*>(pixels.pBits)+540*pixels.Pitch)+960;
+        check((*center&0xffffff)==0x123456,"Recovered device renders the expected physical center pixel");
+        copy->UnlockRect();copy->Release();back->Release();
         check(SUCCEEDED(device->Present(nullptr,nullptr,nullptr,nullptr)),"Present after reset");
     }
     check(device->Release()==0,"Complete device release");api->Release();DestroyWindow(window);
-    std::puts("PASS: reset preserves logical target identity and presentation");
+    std::puts("PASS: failed reset retries preserve logical target identity and presentation");
 }

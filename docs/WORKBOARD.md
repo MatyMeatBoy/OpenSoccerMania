@@ -5,6 +5,15 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.5. See
 
 ## Continuation verification, 2026-11-17
 
+- Failed-reset/retry coverage now rejects null parameters and four invalid
+  color-buffer resets, then recovers at 640x480, 1280x720, 1024x768 and 640x480.
+  Each recovery checks logical target identity, viewport, actual physical-center
+  pixel readback, presentation and final device release. All eighteen native
+  integration runs pass (`build/tests/gpu-i08t_2st/report.json`). This closes
+  explicit invalid-call recovery coverage, not hardware device removal, live
+  resize or exclusive-fullscreen loss. No production change was needed.
+- Refreshed the README's stale startup/backend/default-framing claims against
+  current evidence, and documented the existing F1/controller settings entry.
 - Published baseline `v0.1.0-pre.5` points to commit
   `548b37c8a2ed747ba8969e9d11fc6fe4c1e37838`. Source/portable ZIP inventories,
   SHA-256 sidecars and GitHub asset digests were checked; extracted source runs

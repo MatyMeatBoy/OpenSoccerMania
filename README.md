@@ -27,8 +27,8 @@ OpenSoccerMania gives your own game files a new desktop launcher and an incremen
 | Launcher | English interface, rounded controls, textured football artwork and local settings. |
 | Import | Private folder imports and content-checked ISO9660/raw-sector images, with read-only mounting or bounded extraction. See [supported layouts and limits](docs/disc-import.md); real image acceptance remains open. |
 | Preservation | Private copies, executable hashes, original backups and reversible version-locked startup patches. |
-| Startup | The owner's supported private copy reaches menus and active gameplay. A complete match and save/reload remain acceptance work. |
-| Modern output | D3D8 commands translated to Direct3D 11 through the user-supplied dgVoodoo wrapper; native instrumentation confirmed 1920×1080 render targets with 4× MSAA. |
+| Startup | The supported private copy reaches menus and active gameplay. An ice-field match reaches final statistics and returns to Main Menu. Story team configuration reloads; intermittent load failure and completed-mission persistence remain open. |
+| Modern output | D3D8 commands translated to Direct3D 11 through the bundled dgVoodoo backend; native instrumentation confirmed 1920×1080 render targets with 4× MSAA. |
 | Window modes | Windowed by default, borderless and explicit fullscreen. Windowed startup was checked with unchanged desktop dimensions. |
 | Languages | Nine text variants and eight voice directories, including Spanish. American and English share one English voice directory; selection behavior remains under investigation. |
 
@@ -93,12 +93,18 @@ or separate download is part of the normal import flow.
 - Display requests through 240 Hz. A display refresh request is not a claim of 240 independent gameplay frames per second.
 - MSAA through 16× when supported by the GPU, and up to 16× anisotropic filtering.
 - Windowed, borderless and exclusive fullscreen presentation. F11 / Alt+Enter toggle Windowed and Borderless while preserving the internal render resolution.
-- Aspect-preserving default presentation. Experimental Hor+ work is incomplete, especially shader-based HUD and cinematic handling.
+- Widescreen is enabled by default, preserving the original vertical framing and camera position. Original-ratio presentation remains selectable. The wider world view and centered UI have selected scene checks; broader HUD, cinematic and camera-transition acceptance remains open.
 - Version-checked Hor+ lens conversion preserves vertical framing; background-layer raster/depth/fog corrections address the black sky, and a separate sprite path addresses tiled-image seams. See [render-layer investigation](docs/render-layer-corrections.md).
 - Generated blue title sidebars for 16:9 and ultrawide, with private edge-color matching for both regional titles. The original 4:3 artwork remains unchanged. See [title artwork and verification](docs/title-branding.md); transition coverage remains experimental.
 - The version-checked stencil shadow composite covers the full output instead of the old 4:3 center; focused GPU tests preserve ordinary HUD centering. Other shadow/effect paths still need scene coverage.
 
 The intended video policy is matching black backgrounds for opening logos, original aspect ratios for cinematics, and integer scaling where practical. HUD elements must keep their shape and adjust to the selected aspect ratio. These are acceptance requirements, not completed feature claims.
+
+Press **F1** in the game, or **Start + View/Select** on a controller, to open
+internal settings. Experimental distant-camera presets are optional; the
+original camera framing remains the default. Controllers use A to confirm and
+B to go back; connected pads remain separate from the keyboard. See
+[controls and device limits](docs/controllers.md).
 
 VRR, FreeSync and G-SYNC depend on monitor/driver configuration. Activation has not been measured here. VRS and temporal techniques such as TAA/DLAA need renderer information and integration that this build does not yet provide.
 
