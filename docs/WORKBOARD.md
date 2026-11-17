@@ -5,6 +5,24 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.7. See
 
 ## Continuation verification, 2026-11-17
 
+- Published [pre.7](https://github.com/MatyMeatBoy/OpenSoccerMania/releases/tag/v0.1.0-pre.7)
+  from exact commit `7dbdec65f5e7543403a124a4f1f44e92d6965651`; CI `44178977744`
+  passes. Root verification runs 135 Python tests (one privilege skip), 21 native
+  CPU checks and 28 exact-DLL GPU/input/import cases (`gpu-4ajah0wk`). Extracted
+  source runs 135 tests with two separately confirmed skips: owner assets are
+  excluded and symlink creation requires Windows permission. Both archive
+  inventories/file hashes and all four public downloads/sidecars verify.
+- The rebuilt and extracted pre.7 launcher passes four-page/import/graphics smoke.
+  Normal startup with a nonadministrator token and actual protected-install write
+  denial uses user storage, retains icons and closes cleanly; ACLs are restored.
+  Both rebuilt native images match the owner-game four-pad accepted images after
+  normalizing only PE timestamps/checksum. Pre.6 candidate, public assets and tag
+  are preserved; its candidate is at `build/released-pre6/OpenSoccerMania/`.
+  Private publication receipts are in `local/release-verification/pre7-build/`.
+  UTF-8 defects in new pre.7 and current-tree pre.4 notes were corrected before
+  final packaging; the discarded provisional source archive remains private.
+  This release is a baseline, not acceptance of playable online synchronization
+  or the remaining hardware/campaign/all-map requirements.
 - Identified shared random-state and common-update seed ownership. Startup uses
   a timing seed; the common update reloads a counter initialized to 999, then
   increments it before returning to additional mode-specific work. A private
