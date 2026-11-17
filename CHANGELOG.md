@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Preserve the caller's Win32 error state across save-list metadata normalization and diagnostic logging.
+- Add bounded save-status diagnostics available only with explicit isolated-probe flags; keep normal game behavior and save bytes unchanged.
+
 ## 0.1.0-pre.5 - 2026-11-17
 
 - Center animated menu models and their depth-clear regions in the same 4:3 UI area, preserving their original local camera. Scope the correction to verified preview callers, restore viewports after draws, and preserve world cameras and experimental gameplay zooms.

@@ -5,6 +5,41 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.5. See
 
 ## Continuation verification, 2026-11-17
 
+- Published baseline `v0.1.0-pre.5` points to commit
+  `548b37c8a2ed747ba8969e9d11fc6fe4c1e37838`. Source/portable ZIP inventories,
+  SHA-256 sidecars and GitHub asset digests were checked; extracted source runs
+  125 tests (two expected skips), extracted portable smoke passes, and public CI
+  passes 125 tests with the private-owner-input skip. Release notes explicitly
+  disclose intermittent Story load failure after an apparent successful autosave.
+- The first Story team configuration persists: creating six players confirms
+  AUTOSAVE SUCCESSFUL and changes SAVE0000.SAV. A later process initially shows
+  LOAD FAILED, then a retry loads and reaches the configured City Park story map.
+  Reload leaves the save hashes unchanged and closes cleanly. Evidence:
+  `local/acceptance-2026-11-17/story-team-reload/summary.json`. This is team
+  configuration persistence, not completed-mission progression or universal load
+  acceptance.
+- Post-release save-hook correction: a production-DLL regression sets a known
+  Win32 LastError before the status accessor. The previous guard loses that
+  value (`gpu-pr2gv40n`); an RAII restoration now preserves the original accessor's
+  error state on every return. All seventeen integration cases pass after this
+  correction (`gpu-hdixp0e4`). This change is unreleased and does not replace the
+  published pre.5 binaries.
+- Expanded post-release checks cover failed statuses and unrelated callers as
+  well as normalization. All eighteen native integration cases pass, including
+  a separate run with synchronous save-status tracing explicitly enabled
+  (`gpu-l15i2ocv`); the Python suite passes 125 tests with one privilege skip.
+  Independent review found no actionable introduced issues.
+- Opt-in isolated SaveStatus events now retain repeated equal results, with
+  timestamps and read/phase fields. Earlier per-caller suppression hid repeated
+  operations; those traces cannot prove that no second read occurred. Synchronous
+  diagnostic logging can influence timing, so it is not performance evidence.
+- A separate A/B with that synchronous trace disabled in both variants and an
+  external read-only observer loads the same Story save successfully with both
+  published and corrected bridges. Each requests and receives 4800 payload bytes
+  and completes the load phases without an operation error. Thus LastError
+  preservation fixes a verified hook defect but is not yet proven to explain the
+  intermittent frontend LOAD FAILED response. Evidence: `save-ab-legacy/` and
+  `save-ab-fixed/` under `local/acceptance-2026-11-17/`.
 - Preview alignment is now verified for the observed animated model path. The
   model renderer and its clear operation have separate, signature-checked caller
   scopes; the preceding UI flush is not marked as model geometry. Local preview

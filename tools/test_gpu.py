@@ -77,7 +77,7 @@ def main():
             elif name == 'clear_rect':
                 variants += [('--original-aspect',)]
             elif name == 'save_metadata_runtime':
-                variants += [('--unsupported',)]
+                variants += [('--unsupported',), ('--trace',)]
             elif name == 'input_mailbox':
                 variants = [(str(directory / 'dinput8.dll'),)]
             for variant in variants:

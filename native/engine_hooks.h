@@ -27,11 +27,23 @@ static bool engine_gameplay() {
         *reinterpret_cast<const unsigned*>(0x5b75cc)>0;
 }
 static char engine_log[MAX_PATH];
+static bool trace_save_status=false;
 using SaveStatus=int (__cdecl *)();
 static SaveStatus original_save_status;
 static int __cdecl save_status() {
     const int result=original_save_status();
-    if(result!=0||reinterpret_cast<std::uintptr_t>(__builtin_return_address(0))!=0x4f9c3b)return result;
+    struct ErrorState {DWORD value;~ErrorState(){SetLastError(value);}} restore_error{GetLastError()};
+    const auto caller=reinterpret_cast<std::uintptr_t>(__builtin_return_address(0));
+    if(trace_save_status) {
+        static LONG reports=0;
+        if(InterlockedIncrement(&reports)<=512) {
+            static const ULONGLONG started=GetTickCount64();
+            const ULONGLONG elapsed=GetTickCount64()-started;
+            FILE* file=std::fopen(engine_log,"a");
+            if(file){std::fprintf(file,"SAVE_STATUS elapsed_ms=%llu caller=%08lx status=%d io_command=%u list_phase=%u list_index=%u list_result=%u load_expected=%u load_read=%u load_phase=%u\n",elapsed,static_cast<unsigned long>(caller),result,*reinterpret_cast<const volatile unsigned*>(0x61d638),*reinterpret_cast<const volatile unsigned*>(0x5b596c),*reinterpret_cast<const volatile unsigned*>(0x682fcc),*reinterpret_cast<const volatile unsigned*>(0x682fc8),*reinterpret_cast<const volatile unsigned*>(0x683700),*reinterpret_cast<const volatile unsigned*>(0x683708),*reinterpret_cast<const volatile unsigned*>(0x5b5960));std::fclose(file);}
+        }
+    }
+    if(result!=0||caller!=0x4f9c3b)return result;
     auto*& source=*reinterpret_cast<const char**>(0x683750);
     std::size_t available=0;
     if(source) {
@@ -226,6 +238,7 @@ static void start_engine_hooks(const char* directory,const char* config) {
     std::snprintf(engine_log,MAX_PATH,"%sopensoccermania-engine.log",directory);
     std::snprintf(engine_config,MAX_PATH,"%s",config);
     isolated_camera_probe=GetPrivateProfileIntA("Diagnostics","IsolateInstance",0,config)!=0;
+    trace_save_status=isolated_camera_probe&&GetPrivateProfileIntA("Diagnostics","TraceSaveStatus",0,config)!=0;
     camera_zoom_index=GetPrivateProfileIntA("Graphics","CameraZoom",0,config);
     if(camera_zoom_index<0||camera_zoom_index>2)camera_zoom_index=0;
     if(!GetPrivateProfileIntA("Graphics","VerifiedExecutable",0,config))return;
