@@ -5,6 +5,18 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.6. See
 
 ## Continuation verification, 2026-11-17
 
+- Identified shared random-state and common-update seed ownership. Startup uses
+  a timing seed; the common update reloads a counter initialized to 999, then
+  increments it before returning to additional mode-specific work. A private
+  source-copy trace verifies 256 BEGIN/seed/END triples across initial and active
+  match windows: every seed load and counter increment matches. All 254 adjacent
+  pairs show other shared-generator use between those calls, so the common
+  routine's exit cannot be treated as the whole-step result. Separate inline
+  and temporary random-state domains also exist. Clean close is exit zero,
+  input desktop unchanged and copied save hashes match. Evidence:
+  `local/netplay-rng-2026-11-17/summary.json`. See
+  [random-state ownership](network-random-state.md). No production seeds/hooks
+  change; identical initial state and cross-process determinism remain unproven.
 - Mapped the raw DirectInput cache (`pad +0x2b8`, 272 bytes), normalization and
   gameplay control edge fields. Corrected the earlier generic-update attribution:
   the direct-pad wrapper is `0x42e440 -> 0x42e680`, with message-pump/menu callers;

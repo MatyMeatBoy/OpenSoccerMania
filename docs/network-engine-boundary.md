@@ -60,3 +60,11 @@ or a host-authoritative design. Menus, cameras and kickoff input observations do
 not establish those properties. Native four-seat assignment and the network room
 relay remain separately verified components; they are not yet a playable online
 match adapter.
+
+## Follow-up on mode dispatch
+
+Both inspected mode paths call common routine `0x480650`, which reloads a
+per-update random seed and increments its counters before returning. Their
+mode-specific work continues afterward. The
+[random-state investigation](network-random-state.md) verifies that behavior in
+two live windows and limits its usefulness as a future adapter/checksum boundary.
