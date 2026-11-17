@@ -5,6 +5,15 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.7. See
 
 ## Continuation verification, 2026-11-17
 
+- Refined the network update boundary against freshly disassembled owner bytes:
+  a clock iteration can skip both mode calls, and either dispatcher can return
+  before its common update. Both complete additional work afterward; the outer
+  loop then copies seven words per counted record before snapshot saving. All
+  24 selected instruction anchors match the supported executable. The next
+  runtime probe must distinguish these paths before assigning network frames;
+  interpolation serialization is not yet a complete authoritative checksum.
+  See [mode completion](network-engine-boundary.md#mode-completion-and-skipped-updates).
+  No production hook, input, timing or published artifact changed.
 - Published [pre.7](https://github.com/MatyMeatBoy/OpenSoccerMania/releases/tag/v0.1.0-pre.7)
   from exact commit `7dbdec65f5e7543403a124a4f1f44e92d6965651`; CI `44178977744`
   passes. Root verification runs 135 Python tests (one privilege skip), 21 native
