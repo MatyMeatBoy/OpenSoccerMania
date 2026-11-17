@@ -439,6 +439,8 @@ class Launcher:
             settings.__post_init__()
             if self.entry:
                 ensure_backend(self.entry,ROOT)
+                source_info=json.loads((self.entry/'opensoccermania-source.json').read_text(encoding='utf-8'))
+                setup_portable(self.entry,source_info.get('sha256',''))
                 config=child(self.entry,'dgVoodoo.conf')
                 wrapper=child(self.entry,'d3d8.dll')
                 if not config or not wrapper:
