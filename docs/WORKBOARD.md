@@ -5,6 +5,24 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.5. See
 
 ## Continuation verification, 2026-11-17
 
+- Window resize feedback is reproduced and corrected. An owner-game probe
+  changes a client to 640x480, after which the backend expands it through
+  1440x845 to 1540x845. Temporary, isolated SetWindowPos tracing identifies the
+  backend DLL as the caller; those temporary hooks were removed from source.
+  Adaptive source-ROI changes in Present now receive an explicit existing-client
+  destination, preserving caller-provided destinations and exclusive fullscreen.
+  An asset-free regression fails before the change (`gpu-3cap_coh`) and passes
+  afterward, including widescreen and original-ratio variants. All twenty-one
+  integration cases pass (`gpu-tzj35bum`); independent review found no actionable
+  introduced issues.
+- The corrected owner-game menu stays at 640x480; independent Windows client
+  reads subsequently confirm 1280x540, 800x600 and restored 960x540. Native F1
+  settings open/close correctly in the wide client. The process closes cleanly
+  with save hashes unchanged. Evidence: `window-sizing-fixed/summary.json`,
+  `window-receipts.json` and captures 1, 3, 4 and 7 under the private evidence
+  root. This accepts the observed menu/settings resize path, not gameplay resize,
+  minimize/restore, fullscreen loss or a real in-game Reset. The published pre.5
+  bridge remains unchanged; this correction is unreleased.
 - Adaptive-reset correction: a new production-DLL variant first fits a 640x480
   client into the physical 1920x1080 target, then repeats reset/recovery at the
   same client size. Before the fix, logical drawing invades the left margin

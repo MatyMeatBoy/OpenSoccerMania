@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Preserve user-resized window dimensions when adaptive presentation changes its source rectangle; explicitly scale into the existing client instead of allowing backend resize feedback.
 - Recompute adaptive window raster scales after device creation or Reset even when the fitted presentation rectangle is unchanged; add GPU readback coverage for failed-reset retries and unchanged-window aspect recovery.
 - Preserve the caller's Win32 error state across save-list metadata normalization and diagnostic logging.
 - Add bounded save-status diagnostics available only with explicit isolated-probe flags; keep normal game behavior and save bytes unchanged.

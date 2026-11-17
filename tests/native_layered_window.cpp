@@ -3,6 +3,7 @@
 #include <d3d8.h>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 static WNDPROC downstream=nullptr;
 static unsigned depth=0,shim_calls=0,legacy_calls=0;
 static bool recursed=false;
@@ -16,7 +17,11 @@ static LRESULT CALLBACK forwarder(HWND window,UINT message,WPARAM w,LPARAM l) {
     if(++depth>8){recursed=true;--depth;return DefWindowProcA(window,message,w,l);}
     const auto result=CallWindowProcA(downstream,window,message,w,l);--depth;return result;
 }
-int main() {
+int main(int argc,char** argv) {
+    const bool original_ratio=argc>1&&std::strcmp(argv[1],"--original-aspect")==0;
+    const bool adaptive=original_ratio||(argc>1&&std::strcmp(argv[1],"--adaptive")==0);
+    check(WritePrivateProfileStringA("Graphics","AutoWindowAspect",adaptive?"1":"0",".\\opensoccermania.ini")!=0,"Configure adaptive resize variant");
+    check(WritePrivateProfileStringA("Graphics","ExperimentalHorPlus",original_ratio?"0":"1",".\\opensoccermania.ini")!=0,"Configure original-ratio variant");
     WNDCLASSA cls={};cls.hInstance=GetModuleHandleA(nullptr);cls.lpfnWndProc=legacy;cls.lpszClassName="OSMLayeredWindowRegression";RegisterClassA(&cls);
     HWND window=CreateWindowA(cls.lpszClassName,"OpenSoccerMania window chain test",WS_OVERLAPPEDWINDOW,0,0,640,480,nullptr,nullptr,cls.hInstance,nullptr);
     HMODULE module=LoadLibraryA(".\\d3d8.dll");check(module!=nullptr,"Load bridge");
@@ -39,6 +44,18 @@ int main() {
     check(SUCCEEDED(api->CreateDevice(0,D3DDEVTYPE_HAL,window,D3DCREATE_HARDWARE_VERTEXPROCESSING,&params,&second)),"Create second device");
     check(!recursed,"Device recreation must not capture a forwarding window layer as its downstream");
     check(SendMessageA(window,WM_APP+7,0,0)==0x5a51&&legacy_calls==2,"Recreated device still forwards to the true original procedure once");
+    if(adaptive) {
+        RECT frame={0,0,640,480};
+        check(AdjustWindowRectEx(&frame,GetWindowLongA(window,GWL_STYLE),FALSE,GetWindowLongA(window,GWL_EXSTYLE)),"Calculate private frame");
+        check(SetWindowPos(window,nullptr,0,0,frame.right-frame.left,frame.bottom-frame.top,SWP_NOMOVE|SWP_NOZORDER|SWP_NOACTIVATE),"Resize private window");
+        for(unsigned i=0;i<8;++i) {
+            check(SUCCEEDED(second->Present(nullptr,nullptr,nullptr,nullptr)),"Present adaptive frame");
+            MSG message={};while(PeekMessageA(&message,nullptr,0,0,PM_REMOVE)){TranslateMessage(&message);DispatchMessageA(&message);}
+        }
+        RECT client={};check(GetClientRect(window,&client),"Read resized client");
+        std::printf("adaptive client=%ldx%ld\n",client.right,client.bottom);
+        check(client.right==640&&client.bottom==480,"Adaptive source rectangle must not resize the user's window");
+    }
     second->Release();first->Release();api->Release();DestroyWindow(window);
     std::puts("PASS: layered window chain, repeated CreateDevice, original-message dispatch and F11 toggles");
 }

@@ -1075,7 +1075,13 @@ static HRESULT WINAPI present(IDirect3DDevice8* device,const RECT* source,const 
         const auto mapped=osm::present_rect({static_cast<int>(source->left),static_cast<int>(source->top),static_cast<int>(source->right-source->left),static_cast<int>(source->bottom-source->top)},raster_x,raster_y,raster_offset_x,raster_offset_y);
         mapped_source={mapped.x,mapped.y,mapped.x+mapped.width,mapped.y+mapped.height};output=&mapped_source;
     } else if((!wide||auto_window_aspect)&&display_mode!=2)output=&presentation_rect;
-    const HRESULT status=real_present(device,output,dest,window,dirty);
+    // An adaptive source ROI changes its dimensions when the client is resized.
+    // Give the backend an explicit destination so it scales into the existing
+    // client instead of resizing that window to the source ROI's pixel size.
+    RECT client_dest={};const RECT* destination=dest;
+    if(!destination&&output&&display_mode!=2&&GetClientRect(window?window:game_window,&client_dest)&&client_dest.right>0&&client_dest.bottom>0)
+        destination=&client_dest;
+    const HRESULT status=real_present(device,output,destination,window,dirty);
     QueryPerformanceCounter(&end);performance_hud.last_present=1000.0*(end.QuadPart-start.QuadPart)/frequency.QuadPart;
     if(display_mode!=2)ClipCursor(nullptr);
     return status;

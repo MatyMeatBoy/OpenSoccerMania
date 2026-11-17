@@ -12,6 +12,15 @@ The dgVoodoo output backend is explicitly Direct3D 11 feature level 11.0. The ga
 
 Windowed startup was checked on the supplied private game copy: a framed, non-topmost Football Mania window, D3D8 device reporting windowed=1, and unchanged desktop dimensions before and after startup. Evidence is local/windowed-verification.json; reproduce with python tools/verify_windowed.py after preparing the private copy and building the bridge. The verification script closes its own test process. Borderless configuration has automated coverage; an interactive borderless run is intentionally excluded from this test to avoid covering the owner's desktop.
 
+Post-pre.5 source builds also preserve manual window sizes while adapting the
+source presentation rectangle. The bridge supplies an explicit client destination
+to the backend: changing the source ROI must not resize the application window.
+An isolated owner-game menu/settings probe retains 640x480, 800x600 and 1280x540
+clients and returns to 960x540 with a clean close. Source-only GPU regressions
+cover both widescreen and original-ratio presentation. Evidence and exact limits
+are recorded in [the work board](WORKBOARD.md); gameplay resize, minimize/restore
+and exclusive device-loss acceptance remain open.
+
 ## Video and HUD policy
 
 Widescreen presentation defaults on. Disabling it fits the original 4:3 content within the output, preserving proportions with side or top/bottom bars. Opening logos should sit on matching black backgrounds; subsequent cinematics must retain their encoded aspect ratio, with integer scaling when it fits and aspect-preserving downscaling when it does not. Per-video integer scaling and adaptive HUD anchors are still implementation work. The experimental Hor+ switch is not evidence that these requirements have been completed.

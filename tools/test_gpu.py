@@ -78,6 +78,8 @@ def main():
                 variants += [('--original-aspect',)]
             elif name == 'device_reset':
                 variants += [('--adaptive',)]
+            elif name == 'layered_window':
+                variants += [('--adaptive',), ('--original-aspect',)]
             elif name == 'save_metadata_runtime':
                 variants += [('--unsupported',), ('--trace',)]
             elif name == 'input_mailbox':
