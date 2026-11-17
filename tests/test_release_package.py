@@ -22,6 +22,7 @@ def fixture(root):
                        'opensoccermania/main.py': b'print("source")\n',
                        'runtime/SDL3.dll': b'public redistributable fixture',
                        'licenses/SDL3.txt': b'SDL license',
+                       'server/Dockerfile': b'FROM python:3.11-slim\n',
                        'third_party/minhook/build/MinGW/Makefile': b'all:\n'}.items():
         path = root / name; path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(data)
     git(root, 'add', '.')

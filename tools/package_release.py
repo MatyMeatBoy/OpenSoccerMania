@@ -18,7 +18,7 @@ import zipfile
 TOP_FILES = {'.gitattributes', '.gitignore', 'CHANGELOG.md', 'LICENSE',
              'OpenSoccerMania.pyw', 'README.md', 'THIRD_PARTY.md', 'requirements.txt'}
 TOP_DIRECTORIES = {'.github', 'assets', 'docs', 'licenses', 'native',
-                   'opensoccermania', 'runtime', 'tests', 'third_party', 'tools'}
+                   'opensoccermania', 'runtime', 'server', 'tests', 'third_party', 'tools'}
 ALLOWED_ASSETS = {'assets/backgrounds/title-extension.png', 'assets/fonts/Nunito.ttf'}
 DENIED_SUFFIXES = {'.exe', '.dll', '.iso', '.bin', '.cue', '.img', '.mdf', '.mds',
                    '.nrg', '.zip', '.7z', '.rar', '.ogg', '.wav', '.mp4', '.avi',
@@ -73,6 +73,8 @@ def _validate_member(name, mode):
             raise ValueError('Unapproved root file in source release: ' + name)
     elif parts[0] not in TOP_DIRECTORIES:
         raise ValueError('Private or unapproved directory in source release: ' + name)
+    if parts[0] == 'server' and name not in {'server/Dockerfile', 'server/README.md', 'server/soccermania-netplay.service'}:
+        raise ValueError('Unapproved server deployment file: ' + name)
     if any(part.casefold() in ('local', '__pycache__', '.venv', '.git') for part in parts):
         raise ValueError('Private/cache directory in source release: ' + name)
     if any(part.casefold() in ('build', 'dist') for part in parts) and not name.startswith('third_party/minhook/build/'):
