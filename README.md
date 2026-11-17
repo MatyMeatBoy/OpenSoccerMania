@@ -32,11 +32,11 @@ OpenSoccerMania gives your own game files a new desktop launcher and an incremen
 
 ## Getting started
 
-**Current prerelease: 0.1.0-pre.3 — self-contained Windows portable launcher and source.**
-See [scope and verification](docs/releases/0.1.0-pre.3.md).
+**Current prerelease: 0.1.0-pre.4 — self-contained Windows portable launcher and source.**
+See [scope and verification](docs/releases/0.1.0-pre.4.md).
 
 For the portable build, download the Windows portable ZIP from
-[the release page](https://github.com/MatyMeatBoy/OpenSoccerMania/releases/tag/v0.1.0-pre.3),
+[the release page](https://github.com/MatyMeatBoy/OpenSoccerMania/releases/tag/v0.1.0-pre.4),
 extract the entire folder to a writable location, and run `OpenSoccerMania.exe`.
 Keep its accompanying files. The launcher includes Python and its dependencies;
 you supply only your own valid game ISO or game folder. The graphics backend,
