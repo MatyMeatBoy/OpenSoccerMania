@@ -76,7 +76,16 @@ int main() {
     for(unsigned y=50;y<1000;y+=47)for(unsigned x=20;x<200;x+=29)check(after[y*1920+x]==after[y*1920+x+1440],"Sidebar repeats preserve native tile phase and gradient");
     check(after[300*1920+100]!=before[300*1920+100],"Pattern reaches the former flat sidebars");
     backbuffer=false;check(osm::menu_draw_side_tiles(device,{target,hud_scale,draw},tiles.data(),tiles.size(),{0,0,640,480}).drawn==0,"Do not alter render-texture paths");backbuffer=true;
-    IDirect3DTexture8* a=texture(device,64,osm::menu_button_pixels(false));IDirect3DTexture8* b=texture(device,64,osm::menu_button_pixels(true));
+    check(osm::controller_prompt_atlas().valid(),"Embedded four-family atlas is available");
+    for(unsigned family=1;family<=4;++family)for(unsigned face=0;face<4;++face){
+        const auto pixels=osm::controller_prompt_pixels(family,face);
+        check(pixels.size()==4096,"Complete family face pixels");
+        auto* prompt=texture(device,64,pixels);
+        D3DLOCKED_RECT lock={};check(SUCCEEDED(IDirect3DTexture8_LockRect(prompt,0,&lock,nullptr,D3DLOCK_READONLY)),"Read uploaded family face");
+        for(unsigned y=0;y<64;++y)check(!std::memcmp(static_cast<const BYTE*>(lock.pBits)+y*lock.Pitch,pixels.data()+y*64,256),"Family texture upload retains exact pixels");
+        IDirect3DTexture8_UnlockRect(prompt,0);IDirect3DTexture8_Release(prompt);
+    }
+    IDirect3DTexture8* a=texture(device,64,osm::controller_prompt_pixels(1,0));IDirect3DTexture8* b=texture(device,64,osm::controller_prompt_pixels(1,1));
     IDirect3DTexture8* atlas=texture(device,128,std::vector<DWORD>(128*64,0xff555555));
     osm::menu_prompt_device=device;osm::menu_prompt_texture=b;IDirect3DDevice8_SetTexture(device,0,reinterpret_cast<IDirect3DBaseTexture8*>(blue));
     {osm::MenuPromptTextureSwap swap(device);IDirect3DDevice8_GetTexture(device,0,&restored_texture);check(restored_texture==reinterpret_cast<IDirect3DBaseTexture8*>(b),"Replace original 64x64 numeric art");IDirect3DBaseTexture8_Release(restored_texture);}

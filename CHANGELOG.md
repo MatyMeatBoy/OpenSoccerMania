@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0-pre.8 - 2026-11-17
+
+- Add licensed CC0 Xbox 360, PlayStation 4, Switch Pro and Steam Deck button glyphs, with a textured Xbox face and software gloss highlight.
+- Detect controller display families through SDL, retain positional input mappings, and support Auto or a manual style in the launcher and F1 settings. Steam Input can require a manual style; physical Deck/Linux acceptance remains open.
+- Use the selected family in original menu prompts and the F1 footer, and show matching button/action previews in the launcher. Preserve the existing hints toggle and four independent player slots.
+- Package an inventoried four-family atlas and original source glyphs with explicit redistribution allowlists and upstream notices.
+
 ## Unreleased
 
 ## 0.1.0-pre.7 - 2026-11-17
@@ -36,14 +43,14 @@
 - Restore logical backbuffer identity, render-target classification and the full logical viewport after a successful graphics-device reset. An asset-free GPU regression reproduces the previous physical-size leak and checks repeated 4:3/16:9 logical resets and presentation.
 - Add `tools/test_native.ps1 -Gpu` for fresh asset-free GPU/input integration using the pinned distributed backend and isolated desktops, with retained reports and captures.
 
-## 0.1.0-pre.3 — 2026-11-16
+## 0.1.0-pre.3 â€” 2026-11-16
 
 - Fix clean-PC imports requesting graphics files: include the pinned official dgVoodoo x86 backend and default configuration, install automatically, and remove component file dialogs.
 - Preserve the original window-message chain before backend device creation, correcting reproduced recursion on device recreation while retaining F11 toggles.
 - Import supported ISO9660/Joliet images without an installed extractor or separate download.
 - Check the frozen launcher with a fresh synthetic ISO and no external process creation, covering automatic graphics provisioning and profile save.
 
-## 0.1.0-pre.2 — 2026-11-16
+## 0.1.0-pre.2 â€” 2026-11-16
 
 - Add an inventoried Windows x64 portable launcher package, including its Python/runtime dependencies and project x86 bridges, with isolated packaged-UI smoke testing.
 - Correct the verified stencil-shadow resolve being compressed into the old 4:3 center; preserve ordinary HUD framing and cover the physical pixel edges.
@@ -62,7 +69,7 @@
 - Correct signed-RHW horizon clipping while preserving sky texture perspective; handle color-only backgrounds and layers straddling the far-depth boundary. GPU regressions cover five buffered/immediate draw paths and restoration of graphics state.
 - Remaining reported issues: goal-net/shadow clipping at the original frame, apparent camera zoom and camera transitions after goals. All-map/replay visual acceptance remains open.
 
-## 0.1.0-pre.1 — 2026-11-16
+## 0.1.0-pre.1 â€” 2026-11-16
 
 First public experimental source snapshot for Windows. This is an incremental compatibility and modernization project using the owner's original x86 game, not a completed recompilation.
 

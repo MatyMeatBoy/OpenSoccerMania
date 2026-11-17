@@ -14,7 +14,7 @@
 
 A preservation and modernization project for **LEGO Soccer Mania / Football Mania (PC, 2002)**.
 
-[Prereleases](https://github.com/MatyMeatBoy/OpenSoccerMania/releases) · [Changelog](CHANGELOG.md) · [Getting started](#getting-started) · [Graphics](#graphics) · [Development](#development) · [Current limits](#current-limits)
+[Prereleases](https://github.com/MatyMeatBoy/OpenSoccerMania/releases) Â· [Changelog](CHANGELOG.md) Â· [Getting started](#getting-started) Â· [Graphics](#graphics) Â· [Development](#development) Â· [Current limits](#current-limits)
 
 </div>
 
@@ -27,18 +27,18 @@ OpenSoccerMania gives your own game files a new desktop launcher and an incremen
 | Launcher | English interface, rounded controls, textured football artwork and local settings. |
 | Import | Private folder imports and content-checked ISO9660/raw-sector images, with read-only mounting or bounded extraction. See [supported layouts and limits](docs/disc-import.md); real image acceptance remains open. |
 | Preservation | Private copies, executable hashes, original backups and reversible version-locked startup patches. |
-| Startup | The supported private copy reaches menus and active gameplay. An ice-field match reaches final statistics and returns to Main Menu. The City Park → Western Junction Story checkpoint survives a fresh-process reload. Broader campaign/tournament persistence and load recovery remain open. |
-| Modern output | D3D8 commands translated to Direct3D 11 through the bundled dgVoodoo backend; native instrumentation confirmed 1920×1080 render targets with 4× MSAA. |
+| Startup | The supported private copy reaches menus and active gameplay. An ice-field match reaches final statistics and returns to Main Menu. The City Park â†’ Western Junction Story checkpoint survives a fresh-process reload. Broader campaign/tournament persistence and load recovery remain open. |
+| Modern output | D3D8 commands translated to Direct3D 11 through the bundled dgVoodoo backend; native instrumentation confirmed 1920Ã—1080 render targets with 4Ã— MSAA. |
 | Window modes | Windowed by default, borderless and explicit fullscreen. Windowed startup was checked with unchanged desktop dimensions. |
 | Languages | Nine text variants and eight voice directories, including Spanish. American and English share one English voice directory; selection behavior remains under investigation. |
 
 ## Getting started
 
-**Current prerelease: 0.1.0-pre.7 — self-contained Windows portable launcher and source.**
-See [scope and verification](docs/releases/0.1.0-pre.7.md).
+**Current prerelease: 0.1.0-pre.8 â€” self-contained Windows portable launcher and source.**
+See [scope and verification](docs/releases/0.1.0-pre.8.md).
 
 For the portable build, download the Windows portable ZIP from
-[the release page](https://github.com/MatyMeatBoy/OpenSoccerMania/releases/tag/v0.1.0-pre.7),
+[the release page](https://github.com/MatyMeatBoy/OpenSoccerMania/releases/tag/v0.1.0-pre.8),
 extract the entire folder and run `OpenSoccerMania.exe` as a normal user.
 Keep its accompanying files. The launcher includes Python and its dependencies;
 you supply only your own valid game ISO or game folder. The graphics backend,
@@ -91,7 +91,7 @@ or separate download is part of the normal import flow.
 
 - Configurable internal rendering up to 3840 x 2160 and ultrawide formats. Both 1920x1080 and 3840x2160 target allocation have been observed. Live 4K presentation and hardware acceptance remain pending. Original low-resolution cinematics retain their source detail.
 - Display requests through 240 Hz. A display refresh request is not a claim of 240 independent gameplay frames per second.
-- MSAA through 16× when supported by the GPU, and up to 16× anisotropic filtering.
+- MSAA through 16Ã— when supported by the GPU, and up to 16Ã— anisotropic filtering.
 - Windowed, borderless and exclusive fullscreen presentation. F11 / Alt+Enter toggle Windowed and Borderless while preserving the internal render resolution.
 - Widescreen is enabled by default, preserving the original vertical framing and camera position. Original-ratio presentation remains selectable. The wider world view and centered UI have selected scene checks; broader HUD, cinematic and camera-transition acceptance remains open.
 - Version-checked Hor+ lens conversion preserves vertical framing; background-layer raster/depth/fog corrections address the black sky, and a separate sprite path addresses tiled-image seams. See [render-layer investigation](docs/render-layer-corrections.md).

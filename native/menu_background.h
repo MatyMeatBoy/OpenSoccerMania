@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
+#include "controller_prompts.h"
 #include "../third_party/minhook/include/MinHook.h"
 
 namespace osm {
@@ -141,17 +142,21 @@ class MenuBackground {
     Sprite sprite_=nullptr;Backdrop backdrop_=nullptr;Flush flush_=nullptr;GetClip get_clip_=nullptr;
     MenuBackgroundAdapter adapter_={};char config_[MAX_PATH]={},log_[MAX_PATH]={};
     IDirect3DDevice8* device_=nullptr;IDirect3DTexture8* buttons_[2]={};
+    unsigned detected_family_=1,prompt_style_=0,texture_family_=1;
     bool controller_=false,prompts_=true,capturing_=false,overflow_=false;ULONGLONG refresh_=0;
     std::array<MenuTile,512> tiles_={};std::size_t count_=0;
+    void release_buttons(){for(auto*& texture:buttons_){auto* old=texture;texture=nullptr;if(old)IDirect3DTexture8_Release(old);}}
+    void select_family(){const unsigned family=resolve_prompt_family(prompt_style_,detected_family_);if(family!=texture_family_){release_buttons();texture_family_=family;}}
     bool ready()const{return device_&&adapter_.backbuffer&&adapter_.backbuffer();}
     bool texture(unsigned index) {
         if(buttons_[index])return true;
         if(!device_)return false;
+        const auto pixels=controller_prompt_pixels(texture_family_,index==0?1:0);
+        if(pixels.size()!=4096)return false;
         IDirect3DTexture8* value=nullptr;
         if(FAILED(IDirect3DDevice8_CreateTexture(device_,64,64,1,0,D3DFMT_A8R8G8B8,D3DPOOL_MANAGED,&value)))return false;
         D3DLOCKED_RECT lock={};
         if(FAILED(IDirect3DTexture8_LockRect(value,0,&lock,nullptr,0))){IDirect3DTexture8_Release(value);return false;}
-        const auto pixels=menu_button_pixels(index==0);
         for(unsigned y=0;y<64;++y)std::memcpy(static_cast<unsigned char*>(lock.pBits)+y*lock.Pitch,pixels.data()+y*64,64*4);
         const HRESULT result=IDirect3DTexture8_UnlockRect(value,0);
         if(FAILED(result)){IDirect3DTexture8_Release(value);return false;}
@@ -170,7 +175,8 @@ class MenuBackground {
         }
         const int prompt=menu_prompt_context(caller);
         if(!prompt||!self.controller_||!self.ready()){self.sprite_(image,x,y,flags,color);return;}
-        if(GetTickCount64()>=self.refresh_){self.prompts_=GetPrivateProfileIntA("Graphics","XboxPrompts",1,self.config_)!=0;self.refresh_=GetTickCount64()+1000;}
+        if(GetTickCount64()>=self.refresh_){self.prompts_=GetPrivateProfileIntA("Graphics","XboxPrompts",1,self.config_)!=0;self.prompt_style_=GetPrivateProfileIntA("Graphics","ControllerPromptFamily",0,self.config_);self.refresh_=GetTickCount64()+1000;}
+        self.select_family();
         if(!self.prompts_||!image||*reinterpret_cast<const WORD*>(static_cast<unsigned char*>(image)+8)!=64||*reinterpret_cast<const WORD*>(static_cast<unsigned char*>(image)+10)!=64||!self.texture(prompt-1)){self.sprite_(image,x,y,flags,color);return;}
         self.flush_();
         auto* saved_device=menu_prompt_device;auto* saved_texture=menu_prompt_texture;
@@ -178,7 +184,7 @@ class MenuBackground {
         const auto before=menu_prompt_swaps;self.sprite_(image,x,y,flags,color);self.flush_();
         menu_prompt_device=saved_device;menu_prompt_texture=saved_texture;
         static unsigned reports=0;
-        if(reports<4){++reports;const auto* v=reinterpret_cast<const float*>(0x66d5b0);FILE* f=std::fopen(self.log_,"a");if(f){std::fprintf(f,"MENU_PROMPT icon=%c swaps=%llu sprite=64x64 uv=%.3f,%.3f:%.3f,%.3f\n",prompt==1?'B':'A',menu_prompt_swaps-before,v[3],v[4],v[18],v[19]);std::fclose(f);}}
+        if(reports<4){++reports;const auto* v=reinterpret_cast<const float*>(0x66d5b0);FILE* f=std::fopen(self.log_,"a");if(f){std::fprintf(f,"MENU_PROMPT family=%u icon=%s swaps=%llu sprite=64x64 uv=%.3f,%.3f:%.3f,%.3f\n",self.texture_family_,prompt_face_label(self.texture_family_,prompt==1?1:0),menu_prompt_swaps-before,v[3],v[4],v[18],v[19]);std::fclose(f);}}
     }
     static void __cdecl backdrop_hook(void* object) {
         auto& self=*instance_;
@@ -192,9 +198,9 @@ class MenuBackground {
         static unsigned reports=0;if(reports++<3){FILE* f=std::fopen(self.log_,"a");if(f){std::fprintf(f,"MENU_BACKGROUND native_tiles=%zu sidebar_tiles=%u hud_scale=%.6f clip_preserved=1 state_restored=1\n",self.count_,drawn,scale);std::fclose(f);}}
     }
 public:
-    void set_controller(bool value){controller_=value;}
+    void set_controller(bool value,unsigned family=1){controller_=value;detected_family_=resolve_prompt_family(0,family);select_family();}
     bool owns_device(IDirect3DDevice8* device)const{return device_==device;}
-    void release(){device_=nullptr;for(auto*& texture:buttons_){auto* old=texture;texture=nullptr;if(old)IDirect3DTexture8_Release(old);}}
+    void release(){release_buttons();device_=nullptr;}
     void set_device(IDirect3DDevice8* device){if(device_!=device){release();device_=device;}}
     bool start(const char* config,const char* log,MenuBackgroundAdapter adapter) {
         std::snprintf(config_,sizeof(config_),"%s",config);std::snprintf(log_,sizeof(log_),"%s",log);adapter_=adapter;

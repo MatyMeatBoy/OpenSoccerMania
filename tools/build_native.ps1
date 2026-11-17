@@ -4,7 +4,7 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $outputDir = Join-Path $projectRoot 'build\native'
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 $branding = Join-Path $outputDir 'branding.o'
-& "$Toolchain\bin\i686-w64-mingw32-windres.exe" -I "$projectRoot\assets\branding" -i "$projectRoot\native\branding.rc" -O coff -o $branding
+& "$Toolchain\bin\i686-w64-mingw32-windres.exe" -I "$projectRoot\assets\branding" -I "$projectRoot\assets\controllers" -i "$projectRoot\native\branding.rc" -O coff -o $branding
 if ($LASTEXITCODE -ne 0) { throw 'Branding resource compilation failed.' }
 $hookObjects = @()
 foreach ($source in @('buffer.c','hook.c','trampoline.c','hde\hde32.c')) {

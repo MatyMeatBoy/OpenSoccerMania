@@ -7,6 +7,7 @@ import struct
 import tempfile
 
 from PIL import Image
+from .controller_prompts import BUTTON_ASSETS, asset_path
 
 # Keep these exact redistribution pins aligned with package_release.py/backends.py.
 VENDOR_HASHES = {
@@ -17,6 +18,8 @@ VENDOR_HASHES = {
 RESOURCE_PATHS = ('assets/fonts/Nunito.ttf', 'assets/backgrounds/title-extension.png',
                   'assets/branding/favicon.ico', 'assets/branding/icon.png',
                   'runtime/SDL3.dll', 'native/d3d8.dll', 'native/dinput8.dll', *VENDOR_HASHES, 'licenses/dgVoodoo.txt')
+RESOURCE_PATHS += tuple('assets/'+asset_path(family,button) for family in range(1,5) for button in BUTTON_ASSETS)
+RESOURCE_PATHS += ('assets/controllers/manifest.json','assets/controllers/controller_prompts.bin','licenses/Xelu-Controller-Prompts.txt')
 
 
 def validate_resources(root):
@@ -77,6 +80,13 @@ def run(report_path):
                 for page in ('Home', 'Graphics', 'Controls', 'Compatibility'):
                     app.show(page)
                     root.update_idletasks()
+                from .controller_prompts import PROMPT_STYLES, scheme_rows
+                for family,style in enumerate(PROMPT_STYLES[1:],1):
+                    app.controller_prompt_style.set(style)
+                    root.update_idletasks()
+                    if not all(app.controller_preview_images[family]) or [label.cget('text').strip() for label in app.controller_layout_buttons] != [row[1] for row in scheme_rows(family)]:
+                        raise RuntimeError('Packaged controller preview is incomplete: '+style)
+                app.controller_prompt_style.set('Auto')
                 if errors:
                     raise RuntimeError('; '.join(errors))
                 from .smoke_fixture import write_game_iso
@@ -96,7 +106,7 @@ def run(report_path):
                 finally:
                     launcher.mounted_iso=old_mount;launcher.subprocess.Popen=old_popen;app.run_work=old_worker
                 report.update(passed=True, pages=4, settings_isolated=True, synthetic_iso_import=True,
-                              external_processes=False, graphics_provisioned=True)
+                              external_processes=False, graphics_provisioned=True, controller_families=4)
             finally:
                 if app:
                     app.close()

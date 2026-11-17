@@ -15,3 +15,10 @@
   in `runtime/graphics/dgVoodoo/manifest.json`. These files are not MIT licensed.
 
 The original game and its media are user-supplied and are not included.
+
+- Controller glyphs: [Xelu's FREE Controller Prompts](https://thoseawesomeguys.com/prompts/),
+  Nicolae (Xelu) Berbece / Those Awesome Guys, with upstream page credit to
+  Paul Paun (2021). Selected unmodified Xbox 360, PS4, Switch and Steam Deck PNG assets are
+  CC0-1.0. Upstream readme: `licenses/Xelu-Controller-Prompts.txt`; archive and
+  source-file hashes: `assets/controllers/manifest.json`. Native atlas conversion
+  is a derived size/format conversion. These glyphs are not original game assets.

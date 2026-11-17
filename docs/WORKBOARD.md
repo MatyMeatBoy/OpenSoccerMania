@@ -1,7 +1,32 @@
 # OpenSoccerMania work board
 
-Updated: 2026-11-17. Current baseline: 0.1.0-pre.7. See
-[scope and limits](releases/0.1.0-pre.7.md).
+Updated: 2026-11-17. Current candidate: 0.1.0-pre.8; published baseline: 0.1.0-pre.7. See
+[pre.8 scope and limits](releases/0.1.0-pre.8.md).
+
+## Controller-family baseline, 2026-11-17
+
+- Implemented Xbox 360, PlayStation 4, Switch Pro and Steam Deck visual families
+  with SDL type detection, Auto/manual style, positional labels and licensed CC0
+  assets. The original menus and F1 use the embedded atlas; launcher Controls
+  previews all four layouts. Physical Nintendo south/east remain B/A.
+- Four-family launcher UI/image/label/persistence QA and real-game F1/menu
+  captures pass on private desktops; all 16 commands complete and the game exits
+  cleanly. Evidence: `local/controller-assets/qa/`,
+  `local/controller-assets/game-qa/`. These are simulated input/display tests,
+  not physical PS4/Switch/Deck or Linux/Proton hardware acceptance.
+- The pre.8 frozen candidate passes four-page/import/graphics smoke with all four
+  previews. A real standard token starts it with NTFS install writes denied,
+  retains small/large icons, creates writable user storage and closes cleanly;
+  test ACLs are restored. `local/release-verification/pre8-build/` records these
+  checks. Final source passes 148 Python tests (one privilege skip), 22 named
+  native CPU checks and 31 GPU/input/import cases using the exact frozen DLL.
+  Final archive/publication checks follow below when completed.
+- OptiPort's reusable PC-modding, presentation-clock, licensed-controller-asset
+  and logical-state audit methods are integrated in
+  [OptiPort PR27](https://github.com/MatyMeatBoy/OptiPort/pull/27), canonical main
+  `58843a2c9122720f5db8649c0d9cfdb60dc479cf`. All 36 installed canonical files
+  match that revision; an earlier installed copy is backed up privately.
+  This updates reusable procedures and evidence boundaries, not model weights.
 
 ## Continuation verification, 2026-11-17
 
@@ -12,8 +37,7 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.7. See
   and independent RNG remain open. Both probes close cleanly with saves/input
   desktop unchanged. See [owned-buffer follow-up](network-initial-state.md#follow-up-owned-buffers-and-conditional-flag).
 - Latest user priority adds glossy Xbox 360-style prompts plus PS4 and Switch Pro
-  families, with matching controller-scheme labels and compatibility. Asset and
-  licensing research is underway; existing broader game/network requirements
+  families, with matching controller-scheme labels and compatibility. Asset selection, licensing and integration are recorded above; existing broader game/network requirements
   remain active.
 - Resolved the remaining 26 changed actor words and 19 global/team words through
   descriptor copies, team-array references and dereferenced player contexts.
@@ -523,7 +547,7 @@ Updated: 2026-11-17. Current baseline: 0.1.0-pre.7. See
   investigation; its presence is not yet proven to cause the load failure. The
   visual regression was therefore repeated in a new private entry using Don't
   Save, which cannot establish persistent story progress.
-- Completed a real Quick Start match on the ice field: City Footballers 0–1
+- Completed a real Quick Start match on the ice field: City Footballers 0Ã¢â‚¬â€œ1
   Leo's Lions, with goal/replay, halftime, second half, final statistics and return
   to Main Menu. The 562-second private-desktop run closed with exit zero. This
   supersedes the earlier absence of any completed match, not all-map acceptance.
@@ -709,10 +733,10 @@ OptiPort reference: `MatyMeatBoy/OptiPort`, main commit `9673006504bf6712b320da7
 | Compare region selection | English selected the Football Mania key; American selected the Soccer Mania key and Soccer title assets. Both reported a configured 50 Hz clock. This tests two modes of the supplied executable, not a separate intact American executable. |
 | Measure real simulation | Native step instrumentation observed approximately 50 steps/s in both modes while rendering above 50 FPS. Preserve changing game-speed effects; do not overwrite the authoritative rate. |
 | Independent render wait | Implemented for hash-verified executables with matching function signatures. Startup, gameplay and clean shutdown exercised. Partial hook installation rolls back. Long-session/audio/match-timer equivalence remains pending. |
-| Render limits | Added settings for 60–480 FPS and Unlimited, separate from fullscreen refresh. Actual FPS depends on presentation and workload. VSync-off measurement in progress. |
+| Render limits | Added settings for 60Ã¢â‚¬â€œ480 FPS and Unlimited, separate from fullscreen refresh. Actual FPS depends on presentation and workload. VSync-off measurement in progress. |
 | Camera/frustum | Camera builder receives the output aspect before constructing projection and CPU frustum. Live 16:9 aspect observed as 1.77778. Edge visibility and multiple aspect ratios still need regression checks. |
 | Automated checks | 22 Python tests pass, including unknown-version engine-hook exclusion and adaptive window configuration. Native build succeeds. |
-| Borderless hotkeys | F11 and Alt+Enter added, with foreground-only physical-key polling and held-key suppression. Automated F11 message tests passed in both starting modes, including return to previous window placement and clean exit. Desktop stayed 1536×864; internal target stayed 1920×1080. The backend replaces its window procedure during style changes; the bridge now reinstalls its subclass after that transition. |
+| Borderless hotkeys | F11 and Alt+Enter added, with foreground-only physical-key polling and held-key suppression. Automated F11 message tests passed in both starting modes, including return to previous window placement and clean exit. Desktop stayed 1536Ãƒâ€”864; internal target stayed 1920Ãƒâ€”1080. The backend replaces its window procedure during style changes; the bridge now reinstalls its subclass after that transition. |
 
 ## Remaining acceptance work
 
@@ -764,7 +788,7 @@ OptiPort reference: `MatyMeatBoy/OptiPort`, main commit `9673006504bf6712b320da7
 
 - Reporter confirms that skies and animations look substantially better, while identifying remaining goal-net/shadow clipping and a bad camera transition after goals. Original apparent zoom must remain the default; distant zooms belong in experimental settings.
 - A live pirate-map sky trace crossed the horizon with signed RHW. GPU tests showed that depth normalization alone still clips negative W. A signed projected-texture path now preserves raster coverage and texture perspective; GPU regressions pass through buffered and immediate indexed/non-indexed paths.
-- A second low-angle trace crossed the far-depth boundary (`0.9998924`–`1.0001178`). Its black-output regression fails before the widened background predicate and passes afterward. Color-only backgrounds also have a reproduced/passing GPU regression.
+- A second low-angle trace crossed the far-depth boundary (`0.9998924`Ã¢â‚¬â€œ`1.0001178`). Its black-output regression fails before the widened background predicate and passes afterward. Color-only backgrounds also have a reproduced/passing GPU regression.
 - Private input-desktop state stayed unchanged throughout testing. Two bounded match probes exited cleanly after their own close requests; other probe states still require forced termination, so clean shutdown is not universally accepted.
 - Next scope is recorded in [modernization follow-up](modernization-next.md): original-zoom camera/goal transitions, world-effect framing, F1 / Start+Select internal settings, controller prompts, broader image intake and selectable Soccer/Football title branding.
 

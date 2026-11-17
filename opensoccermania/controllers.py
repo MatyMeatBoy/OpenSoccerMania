@@ -6,6 +6,7 @@ import time
 import mmap
 import struct
 from pathlib import Path
+from .controller_prompts import detect_family, active_family, family_flags
 
 MENU={0:'Enter',1:'Escape',6:'Space'}
 MATCH={0:'S',1:'D',2:'A',3:'W',9:'Shift',10:'Q',6:'Space'}
@@ -105,7 +106,7 @@ class InputMailbox:
         self.page=mmap.mmap(-1,272,tagname=f'Local\\OpenSoccerMania-Input-{pid}')
         self.sequence=0;self.user=C.windll.user32
 
-    def write(self,keys,enabled=True,background_test=False,controller_present=False,controller_active=False,activity_serial=0,movie_skip=False):
+    def write(self,keys,enabled=True,background_test=False,controller_present=False,controller_active=False,activity_serial=0,movie_skip=False,controller_family=0):
         data=bytearray(256)
         for key in keys:
             scan=self.user.MapVirtualKeyW(KEYS[key],0)
@@ -113,7 +114,7 @@ class InputMailbox:
             if 0<=scan<256:data[scan]=0x80
         self.sequence=(self.sequence+2)&0xfffffffe
         self.page.seek(4);self.page.write(struct.pack('<I',(self.sequence-1)&0xffffffff))
-        self.page.seek(8);self.page.write(struct.pack('<II',int(enabled)|(2 if background_test else 0)|(4 if controller_present else 0)|(8 if controller_active else 0)|(16 if movie_skip else 0),activity_serial&0xffffffff)+data)
+        self.page.seek(8);self.page.write(struct.pack('<II',int(enabled)|(2 if background_test else 0)|(4 if controller_present else 0)|(8 if controller_active else 0)|(16 if movie_skip else 0)|(family_flags(controller_family) if controller_present else 0),activity_serial&0xffffffff)+data)
         self.page.seek(0);self.page.write(struct.pack('<II',0x494d534f,self.sequence))
 
     def close(self):
@@ -167,7 +168,7 @@ class ControllerBridge:
         self.mode='Menu';self.automatic_mode=True;self.deadzone=.2;self.enabled=True
         self.mapping={'Menu':dict(MENU),'Match':dict(MATCH)}
         self.selected_id=None;self.raw_mapping=dict(RAW_XBOX)
-        self.status='Starting SDL controller discovery...';self.devices=[]
+        self.status='Starting SDL controller discovery...';self.devices=[];self.prompt_family=1
         self.stop_event=threading.Event();self.thread=None
     def start(self):
         if self.thread and self.thread.is_alive():return
@@ -190,6 +191,7 @@ class ControllerBridge:
             bind('SDL_PumpEvents',None,[]);bind('SDL_GetError',C.c_char_p,[])
             bind('SDL_GetJoysticks',C.POINTER(C.c_uint32),[C.POINTER(C.c_int)])
             bind('SDL_free',None,[C.c_void_p]);bind('SDL_IsGamepad',C.c_bool,[C.c_uint32])
+            bind('SDL_GetGamepadType',C.c_int,[C.c_void_p])
             for prefix in ['Gamepad','Joystick']:
                 bind('SDL_Open'+prefix,C.c_void_p,[C.c_uint32]);bind('SDL_Close'+prefix,None,[C.c_void_p])
                 bind('SDL_Get'+prefix+'Name',C.c_char_p,[C.c_void_p])
@@ -208,7 +210,7 @@ class ControllerBridge:
                     if array:sdl.SDL_free(array)
                     for identity in list(handles):
                         if identity not in ids:
-                            pointer,mapped,_=handles.pop(identity)
+                            pointer,mapped,_,_=handles.pop(identity)
                             (sdl.SDL_CloseGamepad if mapped else sdl.SDL_CloseJoystick)(pointer)
                             gestures.pop(identity,None);pulses.pop(identity,None);previous_samples.pop(identity,None)
                     for identity in sorted(ids-handles.keys()):
@@ -216,9 +218,11 @@ class ControllerBridge:
                         pointer=(sdl.SDL_OpenGamepad if mapped else sdl.SDL_OpenJoystick)(identity)
                         if pointer:
                             name=(sdl.SDL_GetGamepadName if mapped else sdl.SDL_GetJoystickName)(pointer)
-                            handles[identity]=(pointer,mapped,(name or b'Controller').decode(errors='replace'))
+                            decoded=(name or b'Controller').decode(errors='replace')
+                            family=detect_family(sdl.SDL_GetGamepadType(pointer) if mapped else 0,decoded)
+                            handles[identity]=(pointer,mapped,decoded,family)
                     slots.update(handles)
-                    self.devices=[{'id':i,'name':v[2],'mapped':v[1],'slot':slots.identities.index(i)+1 if i in slots.identities else None} for i,v in handles.items()]
+                    self.devices=[{'id':i,'name':v[2],'mapped':v[1],'family':int(v[3]),'slot':slots.identities.index(i)+1 if i in slots.identities else None} for i,v in handles.items()]
                     self.status=', '.join(f"{d['name']} (pad {d['slot']})" if d['slot'] else f"{d['name']} (four-pad limit)" for d in self.devices) or 'No controllers connected. Hot-plug discovery is active.'
                     last_scan=now
                 if self.pid!=mailbox_pid:
@@ -235,7 +239,7 @@ class ControllerBridge:
                 deadzone=max(.05,min(.95,self.deadzone))
                 for identity in slots.identities:
                     if identity is None:native_states.append(None);continue
-                    pointer,mapped,_=handles[identity]
+                    pointer,mapped,_,_=handles[identity]
                     if mapped:
                         buttons={b for b in range(15) if sdl.SDL_GetGamepadButton(pointer,b)}
                         axes=tuple(sdl.SDL_GetGamepadAxis(pointer,i)/32767 for i in range(2))
@@ -270,7 +274,8 @@ class ControllerBridge:
                 if skip and active and not panel:wanted.add('Escape')
                 if active and panel and selected in samples:
                     buttons,axes=samples[selected];wanted|=overlay_keys(buttons,axes,True,deadzone)
-                if mailbox:mailbox.write(wanted,active,controller_present=bool(handles),controller_active=active and now-last_activity<2.,activity_serial=activity_serial,movie_skip=skip and not panel)
+                self.prompt_family=int(active_family({i:v[3] for i,v in handles.items() if i in samples},self.selected_id,overlay_identity))
+                if mailbox:mailbox.write(wanted,active,controller_present=bool(handles),controller_active=active and now-last_activity<2.,activity_serial=activity_serial,movie_skip=skip and not panel,controller_family=self.prompt_family)
                 if pad_mailbox:pad_mailbox.write(native_states,active,effective_mode(self.mode,self.automatic_mode,state)=='Match')
                 self.stop_event.wait(.008)
         except Exception as error:
@@ -281,5 +286,5 @@ class ControllerBridge:
             if pad_mailbox:pad_mailbox.close()
             if ui_mailbox:ui_mailbox.close()
             if sdl and initialized:
-                for pointer,mapped,_ in handles.values():(sdl.SDL_CloseGamepad if mapped else sdl.SDL_CloseJoystick)(pointer)
+                for pointer,mapped,_,_ in handles.values():(sdl.SDL_CloseGamepad if mapped else sdl.SDL_CloseJoystick)(pointer)
                 sdl.SDL_Quit()

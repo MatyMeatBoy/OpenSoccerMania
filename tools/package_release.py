@@ -23,6 +23,15 @@ ALLOWED_ASSETS = {'assets/backgrounds/title-extension.png', 'assets/fonts/Nunito
 ALLOWED_ASSETS |= {f'assets/branding/{name}' for name in
                   ('favicon.svg', 'favicon.ico', 'icon.png', 'favicon-16.png',
                    'favicon-32.png', 'apple-touch-icon.png')}
+CONTROLLER_ATLAS = 'assets/controllers/controller_prompts.bin'
+ALLOWED_ASSETS |= {'assets/controllers/manifest.json', CONTROLLER_ATLAS}
+ALLOWED_ASSETS |= {f'assets/controllers/{family}/{button}.png'
+                  for family in ('xbox360', 'ps4', 'switch_pro', 'steam_deck')
+                  for button in ('south', 'east', 'west', 'north', 'left_shoulder',
+                                 'right_shoulder', 'left_trigger', 'right_trigger',
+                                 'back', 'start', 'left_stick', 'right_stick', 'dpad')}
+ASSET_DIRECTORIES = {str(parent) for name in ALLOWED_ASSETS
+                     for parent in PurePosixPath(name).parents if str(parent) != '.'}
 DENIED_SUFFIXES = {'.exe', '.dll', '.iso', '.bin', '.cue', '.img', '.mdf', '.mds',
                    '.nrg', '.zip', '.7z', '.rar', '.ogg', '.wav', '.mp4', '.avi',
                    '.bik', '.bmp', '.log', '.sav', '.bak', '.pyc', '.pdb', '.obj',
@@ -86,7 +95,7 @@ def _validate_member(name, mode):
         raise ValueError('Asset requires explicit public redistribution approval: ' + name)
     if parts[0] == 'runtime' and name != 'runtime/SDL3.dll' and name not in VENDOR_FILES:
         raise ValueError('Unapproved runtime binary: ' + name)
-    if path.suffix.lower() in DENIED_SUFFIXES and name != 'runtime/SDL3.dll' and name not in VENDOR_FILES:
+    if path.suffix.lower() in DENIED_SUFFIXES and name not in ('runtime/SDL3.dll', CONTROLLER_ATLAS) and name not in VENDOR_FILES:
         raise ValueError('Binary, game, wrapper or private artifact in source release: ' + name)
     if ('dgvoodoo' in name.casefold() and name not in VENDOR_FILES and name != VENDOR_LICENSE) or (path.name.casefold().startswith(('osm-frame-', 'capture', 'screenshot')) and name != 'native/capture_pixels.h'):
         raise ValueError('Wrapper or private capture in source release: ' + name)

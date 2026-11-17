@@ -43,6 +43,14 @@ public:
         const auto* words=reinterpret_cast<const volatile DWORD*>(memory_);
         return words[0]==0x494d534f&&!(words[1]&1)&&(words[2]&4);
     }
+    unsigned controller_family()const {
+        if(!memory_)return 1;
+        const auto* words=reinterpret_cast<const volatile DWORD*>(memory_);
+        const DWORD sequence=words[1],flags=words[2],magic=words[0];MemoryBarrier();
+        if(magic!=0x494d534f||(sequence&1)||words[1]!=sequence||!(flags&4))return 1;
+        const unsigned family=(flags>>8)&7;
+        return family>=1&&family<=4?family:1;
+    }
     DWORD controller_activity(bool& active)const {
         active=false;if(!memory_)return 0;
         const auto* words=reinterpret_cast<const volatile DWORD*>(memory_);

@@ -6,12 +6,16 @@
 #include <cstring>
 static void check(bool value,const char* text){if(!value){std::fprintf(stderr,"FAIL: %s\n",text);std::exit(1);}}
 static LRESULT CALLBACK procedure(HWND window,UINT message,WPARAM w,LPARAM l){return DefWindowProcA(window,message,w,l);}
-int main() {
+int main(int argc,char** argv) {
+    const unsigned family=argc>1?static_cast<unsigned>(std::atoi(argv[1])):1;
+    check(family>=1&&family<=4,"Valid controller family fixture");
     WritePrivateProfileStringA("Graphics","CameraZoom","0",".\\opensoccermania.ini");
+    WritePrivateProfileStringA("Graphics","ControllerPromptFamily","0",".\\opensoccermania.ini");
+    WritePrivateProfileStringA("Graphics","XboxPrompts","1",".\\opensoccermania.ini");
     char name[128];std::snprintf(name,sizeof(name),"Local\\OpenSoccerMania-Input-%lu",GetCurrentProcessId());
     HANDLE mapping=CreateFileMappingA(INVALID_HANDLE_VALUE,nullptr,PAGE_READWRITE,0,272,name);
     auto* input=static_cast<BYTE*>(MapViewOfFile(mapping,FILE_MAP_WRITE,0,0,272));check(input!=nullptr,"Create private test input");
-    auto* words=reinterpret_cast<DWORD*>(input);std::memset(input,0,272);words[0]=0x494d534f;words[2]=3;
+    auto* words=reinterpret_cast<DWORD*>(input);std::memset(input,0,272);words[0]=0x494d534f;words[2]=7|(family<<8);
     auto keys=[&](UINT key){InterlockedIncrement(reinterpret_cast<volatile LONG*>(words+1));std::memset(input+16,0,256);if(key){UINT scan=MapVirtualKeyW(key,MAPVK_VK_TO_VSC);if(key==VK_RIGHT)scan|=0x80;input[16+scan]=0x80;}MemoryBarrier();InterlockedIncrement(reinterpret_cast<volatile LONG*>(words+1));};
     WNDCLASSA cls={};cls.hInstance=GetModuleHandleA(nullptr);cls.lpfnWndProc=procedure;cls.lpszClassName="OSMSettingsRegression";RegisterClassA(&cls);
     HWND window=CreateWindowA(cls.lpszClassName,"OpenSoccerMania settings test",WS_OVERLAPPEDWINDOW,0,0,640,480,nullptr,nullptr,cls.hInstance,nullptr);
@@ -38,6 +42,8 @@ int main() {
     const long row=info.biHeight<0?540:info.biHeight-1-540;
     const long offset=header.bfOffBits+row*info.biWidth*4+960*4;std::fseek(image,offset,SEEK_SET);DWORD pixel=0;std::fread(&pixel,4,1,image);std::fclose(image);
     check((pixel&0xffffff)!=0,"Panel center reached GPU output");
+    char capture_name[64];std::snprintf(capture_name,sizeof(capture_name),"settings-family-%u.bmp",family);
+    check(MoveFileExA("osm-frame-60.bmp",capture_name,MOVEFILE_REPLACE_EXISTING),"Retain family-specific GPU capture");
     keys(VK_F1);device->Present(nullptr,nullptr,nullptr,nullptr);check(!(ui[2]&1),"F1 closed panel and released input");keys(0);
     device->Release();api->Release();DestroyWindow(window);UnmapViewOfFile(const_cast<const DWORD*>(ui));CloseHandle(ui_map);UnmapViewOfFile(input);CloseHandle(mapping);
     std::puts("PASS: native F1 panel, persistence, GPU output and input release");

@@ -7,11 +7,11 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $outputDir = Join-Path $projectRoot 'build\tests'
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
-foreach ($name in @('aspect','frame_stats','layout','screen_vertices','capture_pixels','camera_lens','buffer_mirror','private_keyboard','cursor_mode','interpolation','ui_state','settings','edition','portable','hook_chain','title_background','world_effects','menu_background','menu_preview','virtual_pad','pad_fallback')) {
+foreach ($name in @('controller_prompts','aspect','frame_stats','layout','screen_vertices','capture_pixels','camera_lens','buffer_mirror','private_keyboard','cursor_mode','interpolation','ui_state','settings','edition','portable','hook_chain','title_background','world_effects','menu_background','menu_preview','virtual_pad','pad_fallback')) {
     $executable = Join-Path $outputDir "$name.exe"
     & "$Toolchain\bin\i686-w64-mingw32-clang++.exe" -std=c++17 -O2 -Wall -Wextra -static "$projectRoot\tests\native_$name.cpp" -lgdi32 -o $executable
     if ($LASTEXITCODE -ne 0) { throw "Compilation failed: $name" }
-    & $executable
+    if ($name -eq 'controller_prompts') { & $executable (Join-Path $projectRoot 'assets/controllers/controller_prompts.bin') } else { & $executable }
     if ($LASTEXITCODE -ne 0) { throw "Check failed: $name" }
     Write-Output "PASS $name"
 }

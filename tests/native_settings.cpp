@@ -25,6 +25,11 @@ int main() {
         assert(GetPrivateProfileIntA("Graphics","RenderFPS",0,ini.c_str())==360);
         assert(GetPrivateProfileIntA("GeneralExt","FPSLimit",0,wrapper.c_str())==360);
         file=std::fopen(wrapper.c_str(),"rb");char buffer[256]={};assert(file);std::fread(buffer,1,255,file);std::fclose(file);assert(std::strstr(buffer,"Version=0x279"));
+        menu.set_controller(true,2);assert(menu.prompt_family()==2);
+        keyboard[VK_UP]=0x8000;menu.update(key,true,true);keyboard[VK_UP]=0;menu.update(key,true,true);
+        keyboard[VK_RIGHT]=0x8000;menu.update(key,true,true);keyboard[VK_RIGHT]=0;menu.update(key,true,true);
+        assert(GetPrivateProfileIntA("Graphics","ControllerPromptFamily",0,ini.c_str())==1);
+        assert(menu.prompt_family()==1); // Explicit Xbox style overrides detected PlayStation.
         menu.update(key,false,true);assert(!menu.is_open()&&!reader.panel_open());
     }
     DeleteFileA(ini.c_str());DeleteFileA(wrapper.c_str());RemoveDirectoryA(directory.c_str());

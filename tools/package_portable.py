@@ -14,9 +14,9 @@ import re
 import tempfile
 import zipfile
 try:
-    from .package_release import PackageResult, _git, _safe_output, VENDOR_FILES, VENDOR_LICENSE, validate_vendor_file, ALLOWED_ASSETS
+    from .package_release import PackageResult, _git, _safe_output, VENDOR_FILES, VENDOR_LICENSE, validate_vendor_file, ALLOWED_ASSETS, ASSET_DIRECTORIES, CONTROLLER_ATLAS
 except ImportError:
-    from package_release import PackageResult, _git, _safe_output, VENDOR_FILES, VENDOR_LICENSE, validate_vendor_file, ALLOWED_ASSETS
+    from package_release import PackageResult, _git, _safe_output, VENDOR_FILES, VENDOR_LICENSE, validate_vendor_file, ALLOWED_ASSETS, ASSET_DIRECTORIES, CONTROLLER_ATLAS
 
 REQUIRED_FILES = {
     'OpenSoccerMania.exe', 'assets/backgrounds/title-extension.png',
@@ -69,7 +69,7 @@ def _member(name):
         raise ValueError('Private game file in portable input: ' + name)
     if len(parts)>1 and parts[0] not in PUBLIC_DIRECTORIES and not re.fullmatch(r'(?:pillow|pyinstaller)-[0-9.]+\.dist-info',parts[0]):
         raise ValueError('Unapproved portable dependency directory: ' + name)
-    if parts[0] == 'assets' and name not in {'assets', 'assets/backgrounds', 'assets/fonts', 'assets/branding'} | ALLOWED_ASSETS:
+    if parts[0] == 'assets' and name not in ASSET_DIRECTORIES | ALLOWED_ASSETS:
         raise ValueError('Unapproved redistributable asset: ' + name)
     if parts[0] == 'native' and name not in {'native', 'native/d3d8.dll', 'native/dinput8.dll'}:
         raise ValueError('Unapproved project-native binary: ' + name)
@@ -85,7 +85,7 @@ def _member(name):
         raise ValueError('Unapproved portable root file: ' + name)
     if suffix == '.zip' and name != 'base_library.zip':
         raise ValueError('Only the frozen Python base library archive is permitted.')
-    if (suffix in PRIVATE_SUFFIXES and not vendor) or (suffix == '.exe' and name != 'OpenSoccerMania.exe'):
+    if (suffix in PRIVATE_SUFFIXES and not vendor and name != CONTROLLER_ATLAS) or (suffix == '.exe' and name != 'OpenSoccerMania.exe'):
         raise ValueError('Private or unapproved binary file in portable input: ' + name)
     if leaf in ('d3d8.dll', 'dinput8.dll') and name not in ('native/d3d8.dll', 'native/dinput8.dll') and not vendor:
         raise ValueError('Only the validated project-native bridge DLLs may be included.')

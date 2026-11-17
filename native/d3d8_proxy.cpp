@@ -1012,8 +1012,8 @@ static HRESULT WINAPI present(IDirect3DDevice8* device,const RECT* source,const 
     bool controller_active=false;const DWORD activity=private_keyboard.controller_activity(controller_active);
     cursor_mode.update(activity,controller_active,game_window&&GetForegroundWindow()==game_window,cursor_inside_game());
     if(cursor_mode.hidden()&&original_set_cursor&&cursor_inside_game())original_set_cursor(nullptr);
-    settings_menu.set_controller(private_keyboard.controller_present());
-    osm::menu_background.set_controller(private_keyboard.controller_present());
+    settings_menu.set_controller(private_keyboard.controller_present(),private_keyboard.controller_family());
+    osm::menu_background.set_controller(private_keyboard.controller_present(),private_keyboard.controller_family());
     settings_menu.update(settings_key,(game_window&&GetForegroundWindow()==game_window)||private_keyboard.background_test_enabled(),osm::engine_gameplay(),osm::movie_files.load()!=0);
     if(settings_menu.consume_changed()) {
         performance_hud.set_enabled(settings_menu.hud_enabled());

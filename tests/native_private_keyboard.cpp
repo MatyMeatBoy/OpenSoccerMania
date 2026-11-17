@@ -23,7 +23,13 @@ int main() {
         data[16+MapVirtualKeyW(VK_ESCAPE,0)]=0x80;words[2]=17;
         assert(keyboard.state(VK_ESCAPE,true,false)==0); // A stale skip cannot back out of the next menu.
         assert((keyboard.state(VK_ESCAPE,true,true)&0x8000)!=0);
-        assert(keyboard.state(VK_ESCAPE,false,true)==0); // Movie skip still respects foreground ownership.
+        assert(keyboard.state(VK_ESCAPE,false,true)==0);
+        words[2]=0x205;assert(keyboard.controller_family()==2);
+        words[1]=7;assert(keyboard.controller_family()==1);
+        words[1]=8;words[2]=0x405;assert(keyboard.controller_family()==4);
+        words[2]=0x705;assert(keyboard.controller_family()==1);
+        words[2]=0x400;assert(keyboard.controller_family()==1);
+ // Movie skip still respects foreground ownership.
     }
     UnmapViewOfFile(data);CloseHandle(map);
 }

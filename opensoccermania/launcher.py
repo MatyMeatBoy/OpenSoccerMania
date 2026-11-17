@@ -15,7 +15,8 @@ from . import __version__, fonts, artwork
 from .theme import Bubble, CREAM, GREEN, AMBER, MUTED
 from .sources import discover, discover_assets, prepare, prepare_with_executable, mounted_iso, open_disc_image, probe_disc_image, child
 from .video import VideoSettings, RESOLUTIONS, REFRESH_RATES, AA_MODES, FILTER_MODES, DISPLAY_MODES, RENDER_LIMITS, CAMERA_ZOOMS, EDITIONS, LANGUAGES, configure_wrapper
-from .runtime import setup_portable, install_bridge, install_input_bridge, configure_bridge, read_live_settings
+from .runtime import setup_portable, install_bridge, install_input_bridge, configure_bridge, read_live_settings, write_live_prompt_style
+from .controller_prompts import PROMPT_STYLES, resolve_family, scheme_rows, family_name, asset_path
 from .backends import ensure_backend, install_backend
 from .title_assets import load_title_image,TitleAssetError
 from .diagnostics import logger, Session
@@ -201,6 +202,7 @@ class Launcher:
         self.modern_presentation=tk.BooleanVar(value=saved.get('modern_presentation',True))
         self.camera_zoom=tk.StringVar(value=saved.get('camera_zoom','Original zoom'))
         self.xbox_prompts=tk.BooleanVar(value=saved.get('xbox_prompts',True))
+        self.controller_prompt_style=tk.StringVar(value=saved.get('controller_prompt_style','Auto'))
         self.title_extension=tk.BooleanVar(value=saved.get('title_extension',True))
         card=ttk.LabelFrame(frame,text=' DISPLAY & IMAGE QUALITY ',padding=18);card.pack(fill='x')
         for row,(label,var,values) in enumerate([('Internal render resolution',self.res,RESOLUTIONS),('Fullscreen refresh rate (Hz)',self.hz,list(map(str,REFRESH_RATES))),('Antialiasing',self.aa,list(AA_MODES)),('Texture filtering',self.filter,list(FILTER_MODES))]):
@@ -224,9 +226,11 @@ class Launcher:
         ttk.Checkbutton(card,text='Low-latency presentation',variable=self.modern_presentation).grid(row=16,columnspan=2,sticky='w',pady=6)
         ttk.Label(card,text='Camera framing').grid(row=18,column=0,sticky='w',pady=8)
         ttk.Combobox(card,textvariable=self.camera_zoom,values=CAMERA_ZOOMS,state='readonly').grid(row=18,column=1,sticky='ew')
-        ttk.Checkbutton(card,text='Xbox button hints for connected controllers',variable=self.xbox_prompts).grid(row=19,columnspan=2,sticky='w',pady=6)
-        ttk.Checkbutton(card,text='Generated title background in widescreen sidebars',variable=self.title_extension).grid(row=20,columnspan=2,sticky='w',pady=6)
-        ttk.Label(card,text='F1 or View / Select + Start opens in-game settings. Original zoom keeps the original camera distance and vertical framing; distant lenses are optional.',style='Muted.TLabel',wraplength=730).grid(row=21,columnspan=2,sticky='w',pady=(8,0))
+        ttk.Checkbutton(card,text='Controller button hints',variable=self.xbox_prompts).grid(row=19,columnspan=2,sticky='w',pady=6)
+        ttk.Label(card,text='Controller style').grid(row=20,column=0,sticky='w',pady=8)
+        ttk.Combobox(card,textvariable=self.controller_prompt_style,values=PROMPT_STYLES,state='readonly').grid(row=20,column=1,sticky='ew')
+        ttk.Checkbutton(card,text='Generated title background in widescreen sidebars',variable=self.title_extension).grid(row=21,columnspan=2,sticky='w',pady=6)
+        ttk.Label(card,text='F1 or View / Select + Start opens in-game settings. Original zoom keeps the original camera distance and vertical framing; distant lenses are optional.',style='Muted.TLabel',wraplength=730).grid(row=22,columnspan=2,sticky='w',pady=(8,0))
         ttk.Label(card,text='F11 / Alt+Enter: toggle Windowed and Borderless. The render limit preserves the original simulation rate on verified executable versions. VSync can limit FPS to your display refresh. Windowed and borderless modes use the desktop refresh rate.',style='Muted.TLabel',wraplength=730).grid(row=14,columnspan=2,sticky='w',pady=(8,0))
         ttk.Button(frame,text='Save graphics profile',style='Accent.TButton',command=self.save_video).pack(anchor='w',pady=18)
         ttk.Label(frame,text='VRR · FreeSync · G-SYNC',style='Heading.TLabel').pack(anchor='w',pady=(5,5))
@@ -272,23 +276,54 @@ class Launcher:
         mode.bind('<<ComboboxSelected>>',lambda event:setattr(self.controller,'mode',self.controller_mode.get()))
         ttk.Label(row,text='Stick deadzone').pack(side='left',padx=(24,12))
         ttk.Combobox(row,textvariable=self.controller_deadzone,values=['10%','15%','20%','25%','30%'],state='readonly',width=9).pack(side='left')
-        ttk.Label(frame,text='View / Select + Start opens in-game settings. Menu: A confirms, B goes back. Match: A passes, B shoots, X plays a long ball, Y activates power-ups. LB sprints and RB switches players. Select / View skips videos when released. Start pauses; Start + Select opens settings without also pausing or skipping.',style='Muted.TLabel',wraplength=760).pack(anchor='w',pady=(8,15))
-        card=ttk.LabelFrame(frame,text=' XBOX-STYLE MATCH LAYOUT ',padding=15);card.pack(fill='x')
-        self.controller_keys={}
-        for row,(button,action) in enumerate([('A','Pass / slide tackle'),('B','Shoot'),('X','Long ball / foot-in tackle'),('Y','Power-up'),('LB','Sprint'),('RB','Switch player / skill move'),('Start / Menu','Pause'),('Select / View','Skip video')]):
-            ttk.Label(card,text=button).grid(row=row,column=0,sticky='w',padx=(0,30),pady=4)
+        style_row=ttk.Frame(frame);style_row.pack(fill='x',pady=(4,8))
+        ttk.Label(style_row,text='Button style').pack(side='left',padx=(0,15))
+        ttk.Combobox(style_row,textvariable=self.controller_prompt_style,values=PROMPT_STYLES,state='readonly',width=22).pack(side='left')
+        self.controller_help=tk.StringVar()
+        ttk.Label(frame,textvariable=self.controller_help,style='Muted.TLabel',wraplength=760).pack(anchor='w',pady=(4,12))
+        card=ttk.LabelFrame(frame,text=' MATCH LAYOUT ',padding=15);card.pack(fill='x')
+        self.controller_layout_card=card;self.controller_layout_buttons=[]
+        self.controller_preview_images={};self.controller_preview_family=None;self.controller_keys={}
+        for row,(_,_,action) in enumerate(scheme_rows(1)):
+            label=ttk.Label(card,compound='left');label.grid(row=row,column=0,sticky='w',padx=(0,30),pady=2)
+            self.controller_layout_buttons.append(label)
             ttk.Label(card,text=action).grid(row=row,column=1,sticky='w',pady=4)
         card.columnconfigure(1,weight=1)
         raw=ttk.LabelFrame(frame,text=' UNMAPPED DEVICE BUTTONS ',padding=15);raw.pack(fill='x',pady=(18,0))
         ttk.Label(raw,text='Only used for raw joysticks without an SDL gamepad mapping. Button numbers start at zero.',style='Muted.TLabel',wraplength=700).grid(row=0,columnspan=2,sticky='w',pady=(0,8))
-        mapping={int(k):int(v) for k,v in settings.get('raw_mapping',RAW_XBOX).items()};self.raw_buttons={}
+        mapping={int(k):int(v) for k,v in settings.get('raw_mapping',RAW_XBOX).items()};self.raw_buttons={};self.raw_button_labels={}
         for row,(button,label) in enumerate([(0,'A'),(1,'B'),(2,'X'),(3,'Y'),(9,'LB'),(10,'RB'),(4,'View / Select'),(6,'Start / Menu')],1):
             variable=tk.StringVar(value=str(next((k for k,v in mapping.items() if v==button),-1)));self.raw_buttons[button]=variable
-            ttk.Label(raw,text=label).grid(row=row,column=0,sticky='w',padx=(0,25),pady=3)
+            widget=ttk.Label(raw,text=label);widget.grid(row=row,column=0,sticky='w',padx=(0,25),pady=3);self.raw_button_labels[button]=widget
             ttk.Combobox(raw,textvariable=variable,values=['-1',*map(str,range(32))],state='readonly',width=14).grid(row=row,column=1,sticky='ew',pady=3)
         raw.columnconfigure(1,weight=1)
+        self.controller_prompt_style.trace_add('write',lambda *_:self.refresh_controller_layout())
+        self.refresh_controller_layout()
         ttk.Button(frame,text='Save controller profile',style='Accent.TButton',command=self.save_controls).pack(anchor='w',pady=15)
         ttk.Label(frame,text='Left stick / D-pad: movement. SDL handles mapped XInput, DirectInput and HID devices. Raw devices can use the button profile above. Each connected pad has a separate native controller slot; the keyboard remains independent. Choose each player in the game. Physical four-controller play still needs acceptance testing.',style='Muted.TLabel',wraplength=760).pack(anchor='w')
+
+    def refresh_controller_layout(self):
+        if not hasattr(self,'controller_layout_buttons'):return
+        family=int(resolve_family(self.controller_prompt_style.get(),getattr(getattr(self,'controller',None),'prompt_family',1)))
+        if family==self.controller_preview_family:return
+        rows=scheme_rows(family)
+        if family not in self.controller_preview_images:
+            pictures=[]
+            for role,_,_ in rows:
+                try:
+                    with Image.open(ROOT/'assets'/asset_path(family,role)) as original:
+                        picture=original.convert('RGBA').resize((42,42),Image.Resampling.LANCZOS)
+                    pictures.append(ImageTk.PhotoImage(picture,master=self.root))
+                except (OSError,ValueError):pictures.append(None)
+            self.controller_preview_images[family]=pictures
+        for label,(_,name,_),picture in zip(self.controller_layout_buttons,rows,self.controller_preview_images[family]):
+            label.configure(text='  '+name,image=picture or '')
+        self.controller_layout_card.configure(text=' '+family_name(family).upper()+' MATCH LAYOUT ')
+        south,east=rows[0][1],rows[1][1];start,back=rows[6][1],rows[7][1]
+        self.controller_help.set(f'Menu: {south} confirms, {east} goes back. {start} pauses; {back} skips videos on release. {back} + {start} opens settings. Styles follow physical button positions. Steam Input may require a manual style.')
+        for button,row in zip((0,1,2,3,9,10,6,4),rows):
+            if button in self.raw_button_labels:self.raw_button_labels[button].configure(text=row[1])
+        self.controller_preview_family=family
 
     def save_controls(self):
         raw={}
@@ -301,6 +336,12 @@ class Launcher:
         settings['raw_mapping']=raw;self.controller.raw_mapping=raw
         self.controller.automatic_mode=settings['automatic_mode']
         self.controller.enabled=settings['enabled'];self.controller.deadzone=settings['deadzone'];self.controller.mapping['Match']=settings['mapping']
+        style=self.controller_prompt_style.get()
+        try:
+            if self.entry and (self.entry/'opensoccermania.ini').is_file():write_live_prompt_style(self.entry,style)
+        except (OSError,ValueError) as error:
+            self.log.warning('Could not save controller style: %s',error);self.status.set(f'Could not save controller style: {error}');return
+        self.prefs.setdefault('video',{})['controller_prompt_style']=style
         self.prefs['controls']=settings;self.persist();self.status.set('Controller profile saved. Game input is released whenever another app has focus.')
 
     def refresh_library(self):
@@ -345,7 +386,7 @@ class Launcher:
             settings=read_live_settings(self.entry,VideoSettings(**self.prefs.get('video',{})))
             self.prefs['video']=asdict(settings);self.persist()
             self.camera_zoom.set(settings.camera_zoom);self.performance_hud.set(settings.performance_hud)
-            self.overlay_scale.set(f'{settings.overlay_scale}%');self.xbox_prompts.set(settings.xbox_prompts)
+            self.overlay_scale.set(f'{settings.overlay_scale}%');self.xbox_prompts.set(settings.xbox_prompts);self.controller_prompt_style.set(settings.controller_prompt_style)
             self.render_fps.set(next(label for label,value in RENDER_LIMITS.items() if value==settings.render_fps))
         except (OSError,ValueError,TypeError) as error:self.log.warning('Could not synchronize in-game preferences: %s',error)
 
@@ -437,7 +478,7 @@ class Launcher:
             settings.sprite_seam_fix=self.sprite_seam_fix.get()
             settings.modern_presentation=self.modern_presentation.get()
             settings.smooth_interpolation=False
-            settings.camera_zoom=self.camera_zoom.get();settings.xbox_prompts=self.xbox_prompts.get()
+            settings.camera_zoom=self.camera_zoom.get();settings.xbox_prompts=self.xbox_prompts.get();settings.controller_prompt_style=self.controller_prompt_style.get()
             settings.edition=self.edition.get();settings.language=self.language.get();settings.title_extension=self.title_extension.get()
             settings.__post_init__()
             if self.entry:
@@ -511,6 +552,7 @@ class Launcher:
         if hasattr(self,'controller'):
             self.controller_status.set(self.controller.status)
             self.controller_mode.set(self.controller.mode)
+            self.refresh_controller_layout()
             signature=tuple((d['id'],d['name']) for d in self.controller.devices)
             if signature!=self.device_signature:
                 self.device_signature=signature;self.device_options={'Automatic':None,**{f"{d['name']} [{d['id']}]":d['id'] for d in self.controller.devices}}

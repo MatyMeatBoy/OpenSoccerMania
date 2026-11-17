@@ -6,6 +6,7 @@
 #include <algorithm>
 #include "ui_state.h"
 #include "performance.h"
+#include "controller_prompts.h"
 
 namespace osm {
 class SettingsMenu {
@@ -13,17 +14,18 @@ class SettingsMenu {
     bool open_=false,gameplay_=false,movie_=false,controller_=false,dirty_=true,changed_=true;
     bool keys_[256]={};ULONGLONG repeats_[256]={},refresh_=0;
     unsigned selected_=0;
-    int zoom_=0,hud_=1,scale_=125,prompts_=1,limit_=240;
+    int zoom_=0,hud_=1,scale_=125,prompts_=1,limit_=240,prompt_style_=0;
+    unsigned controller_family_=1;
     char config_[MAX_PATH]={},log_[MAX_PATH]={},wrapper_[MAX_PATH]={};
     IDirect3DDevice8* texture_device_=nullptr;
     IDirect3DTexture8* texture_=nullptr;
     static int bounded(int value,int lo,int hi,int fallback){return value>=lo&&value<=hi?value:fallback;}
     void publish(){publisher.publish(open_,gameplay_,movie_);}
     void save() {
-        const char* names[]={"CameraZoom","PerformanceHud","OverlayScale","XboxPrompts","RenderFPS"};
-        const int values[]={zoom_,hud_,scale_,prompts_,limit_};
+        const char* names[]={"CameraZoom","PerformanceHud","OverlayScale","XboxPrompts","ControllerPromptFamily","RenderFPS"};
+        const int values[]={zoom_,hud_,scale_,prompts_,prompt_style_,limit_};
         bool success=true;
-        for(unsigned i=0;i<5;++i){char value[16];std::snprintf(value,sizeof(value),"%d",values[i]);success=WritePrivateProfileStringA("Graphics",names[i],value,config_)&&success;}
+        for(unsigned i=0;i<6;++i){char value[16];std::snprintf(value,sizeof(value),"%d",values[i]);success=WritePrivateProfileStringA("Graphics",names[i],value,config_)&&success;}
         if(GetFileAttributesA(wrapper_)!=INVALID_FILE_ATTRIBUTES){char value[16];std::snprintf(value,sizeof(value),"%d",limit_);success=WritePrivateProfileStringA("GeneralExt","FPSLimit",value,wrapper_)&&success;}
         if(!success){FILE* file=std::fopen(log_,"a");if(file){std::fprintf(file,"SETTINGS failed to persist preferences error=%lu\n",GetLastError());std::fclose(file);}}
         dirty_=changed_=true;
@@ -35,8 +37,9 @@ class SettingsMenu {
         const int p=GetPrivateProfileIntA("Graphics","XboxPrompts",1,config_)!=0;
         int l=GetPrivateProfileIntA("Graphics","RenderFPS",240,config_);
         if(l!=0&&l!=60&&l!=120&&l!=144&&l!=165&&l!=240&&l!=360&&l!=480)l=240;
-        if(z!=zoom_||h!=hud_||s!=scale_||p!=prompts_||l!=limit_)dirty_=changed_=true;
-        zoom_=z;hud_=h;scale_=s;prompts_=p;limit_=l;
+        const int style=bounded(GetPrivateProfileIntA("Graphics","ControllerPromptFamily",0,config_),0,4,0);
+        if(style!=prompt_style_||z!=zoom_||h!=hud_||s!=scale_||p!=prompts_||l!=limit_)dirty_=changed_=true;
+        zoom_=z;hud_=h;scale_=s;prompts_=p;prompt_style_=style;limit_=l;
     }
     void change(int direction) {
         switch(selected_) {
@@ -44,7 +47,8 @@ class SettingsMenu {
         case 1:hud_=!hud_;break;
         case 2:scale_=std::max(75,std::min(200,scale_+25*direction));break;
         case 3:prompts_=!prompts_;break;
-        case 4:{constexpr int limits[]={60,120,144,165,240,360,480,0};int index=0;for(int i=0;i<8;++i)if(limits[i]==limit_)index=i;limit_=limits[(index+direction+8)%8];break;}
+        case 4:prompt_style_=(prompt_style_+direction+5)%5;break;
+        case 5:{constexpr int limits[]={60,120,144,165,240,360,480,0};int index=0;for(int i=0;i<8;++i)if(limits[i]==limit_)index=i;limit_=limits[(index+direction+8)%8];break;}
         }
         save();
     }
@@ -66,17 +70,25 @@ class SettingsMenu {
         SetBkMode(dc,TRANSPARENT);
         auto label=[&](int x,int y,const char* text,int size,bool bold,COLORREF color){HFONT font=CreateFontA(-size,0,0,0,bold?FW_BOLD:FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,DEFAULT_PITCH,"Nunito");HGDIOBJ old=SelectObject(dc,font);SetTextColor(dc,color);TextOutA(dc,x,y,text,static_cast<int>(std::strlen(text)));SelectObject(dc,old);DeleteObject(font);};
         label(40,27,"OpenSoccerMania",44,true,RGB(22,61,50));label(42,83,"GRAPHICS & CONTROLS",23,true,RGB(89,112,103));
-        const char* labels[]={"Camera framing","Performance HUD","HUD size","Xbox buttons","Render limit"};
+        const char* labels[]={"Camera framing","Performance HUD","HUD size","Button hints","Controller style","Render limit"};
         const char* zooms[]={"Original zoom","Wide view (experimental)","Distant view (experimental)"};
-        char scale[32],limit[48];std::snprintf(scale,sizeof(scale),"%d%%",scale_);std::snprintf(limit,sizeof(limit),limit_?"%d FPS (restart)":"Unlimited (restart)",limit_);
-        const char* values[]={zooms[zoom_],hud_?"On":"Off",scale,prompts_?"On":"Off",limit};
-        for(unsigned row=0;row<5;++row){const int y=137+static_cast<int>(row)*90;if(row==selected_)box(24,y-8,970,66,22,RGB(216,228,204));label(44,y+2,labels[row],30,true,RGB(22,61,50));label(445,y+3,values[row],27,false,RGB(45,76,62));}
+        char scale[32],limit[48],style[64];
+        std::snprintf(style,sizeof(style),prompt_style_?"%s":"Auto: %s",prompt_style_label(prompt_style_?prompt_style_:prompt_family()));std::snprintf(scale,sizeof(scale),"%d%%",scale_);std::snprintf(limit,sizeof(limit),limit_?"%d FPS (restart)":"Unlimited (restart)",limit_);
+        const char* values[]={zooms[zoom_],hud_?"On":"Off",scale,prompts_?"On":"Off",style,limit};
+        for(unsigned row=0;row<6;++row){const int y=137+static_cast<int>(row)*76;if(row==selected_)box(24,y-8,970,66,22,RGB(216,228,204));label(44,y+2,labels[row],30,true,RGB(22,61,50));label(445,y+3,values[row],27,false,RGB(45,76,62));}
         label(42,610,"Camera options apply immediately. Render limits need a restart.",23,false,RGB(89,112,103));
         label(42,645,"The match keeps running while this panel is open.",23,false,RGB(89,112,103));
-        auto button=[&](int x,int y,const char* letter,COLORREF color){box(x,y,38,38,38,color);label(x+10,y+3,letter,25,true,RGB(255,255,255));};
-        if(controller_&&prompts_){button(42,694,"A",RGB(42,130,73));label(92,699,"Change",23,true,RGB(22,61,50));button(245,694,"B",RGB(183,59,50));label(295,699,"Close",23,true,RGB(22,61,50));label(480,699,"D-pad: navigate   View + Start: close",22,true,RGB(22,61,50));}
+
+        if(controller_&&prompts_){
+            GdiFlush();const unsigned family=prompt_family();
+            if(!paint_controller_prompt(static_cast<DWORD*>(pixels),1024,1024,32,683,60,family,0))label(42,699,prompt_face_label(family,0),19,true,RGB(22,61,50));
+            if(!paint_controller_prompt(static_cast<DWORD*>(pixels),1024,1024,235,683,60,family,1))label(245,699,prompt_face_label(family,1),19,true,RGB(22,61,50));
+            label(98,699,"Change",23,true,RGB(22,61,50));label(301,699,"Close",23,true,RGB(22,61,50));
+            const char* hints[]={"D-pad: move   Back + Start","D-pad: move   Share + Options","D-pad: move   Minus + Plus","D-pad: move   View + Menu"};
+            label(480,699,hints[family-1],22,true,RGB(22,61,50));
+        }
         else label(42,699,"F1: close    Arrows: navigate    Enter: change    Esc: close",23,true,RGB(22,61,50));
-        auto* rgba=static_cast<DWORD*>(pixels);for(unsigned i=0;i<1024*1024;++i)if(rgba[i]&0xffffff)rgba[i]|=0xff000000;
+        GdiFlush();auto* rgba=static_cast<DWORD*>(pixels);for(unsigned i=0;i<1024*1024;++i)if(rgba[i]&0xffffff)rgba[i]|=0xff000000;
         D3DLOCKED_RECT locked={};const HRESULT status=IDirect3DTexture8_LockRect(texture_,0,&locked,nullptr,0);
         if(SUCCEEDED(status)){for(unsigned y=0;y<1024;++y)std::memcpy(static_cast<BYTE*>(locked.pBits)+y*locked.Pitch,rgba+y*1024,4096);IDirect3DTexture8_UnlockRect(texture_,0);}
         SelectObject(dc,old_bitmap);DeleteObject(bitmap);DeleteDC(dc);dirty_=FAILED(status);return SUCCEEDED(status);
@@ -93,7 +105,8 @@ public:
     int hud_scale()const{return scale_;}
     int zoom_index()const{return zoom_;}
     bool consume_changed(){const bool value=changed_;changed_=false;return value;}
-    void set_controller(bool value){if(value!=controller_){controller_=value;dirty_=true;}}
+    unsigned prompt_family()const{return resolve_prompt_family(prompt_style_,controller_family_);}
+    void set_controller(bool value,unsigned family=1){family=resolve_prompt_family(0,family);if(value!=controller_||family!=controller_family_){controller_=value;controller_family_=family;dirty_=true;}}
     void close_panel(){if(open_){open_=false;publish();}}
     void sync_hud(bool enabled){if(enabled!=(hud_!=0)){hud_=enabled;save();}}
     void update(SHORT (*key)(int),bool active,bool gameplay,bool movie=false) {
@@ -105,10 +118,10 @@ public:
         if(pressed(VK_F1,false)){open_=!open_;dirty_=true;}
         if(open_) {
             if(pressed(VK_ESCAPE,false))open_=false;
-            if(pressed(VK_UP,true)){selected_=(selected_+4)%5;dirty_=true;}
-            if(pressed(VK_DOWN,true)){selected_=(selected_+1)%5;dirty_=true;}
+            if(pressed(VK_UP,true)){selected_=(selected_+5)%6;dirty_=true;}
+            if(pressed(VK_DOWN,true)){selected_=(selected_+1)%6;dirty_=true;}
             if(pressed(VK_PRIOR,false)){selected_=0;dirty_=true;}
-            if(pressed(VK_NEXT,false)){selected_=4;dirty_=true;}
+            if(pressed(VK_NEXT,false)){selected_=5;dirty_=true;}
             if(pressed(VK_LEFT,true))change(-1);
             if(pressed(VK_RIGHT,true)||pressed(VK_RETURN,false))change(1);
         }

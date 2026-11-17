@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import configparser
 import io
 import re
+from .controller_prompts import PROMPT_STYLES
 
 RESOLUTIONS = ['1280 × 720', '1920 × 1080', '2560 × 1440', '3840 × 2160', '2560 × 1080', '3440 × 1440', '3840 × 1600', '3840 × 1080', '1920 × 1440']
 REFRESH_RATES = [60, 75, 100, 120, 144, 165, 180, 200, 240]
@@ -38,6 +39,7 @@ class VideoSettings:
     smooth_interpolation: bool = False  # Accept old preferences; feature retired.
     camera_zoom: str = 'Original zoom'
     xbox_prompts: bool = True
+    controller_prompt_style: str = 'Auto'
     edition: str = 'Football Mania'
     language: str = 'English'
     title_extension: bool = True
@@ -48,6 +50,8 @@ class VideoSettings:
 
     def __post_init__(self):
         self.smooth_interpolation=False
+        if self.controller_prompt_style not in PROMPT_STYLES:
+            raise ValueError('Choose Auto, Xbox 360, PlayStation 4, Switch Pro or Steam Deck button hints.')
         if not (640 <= self.width <= 3840 and 480 <= self.height <= 2160 and self.refresh in REFRESH_RATES):
             raise ValueError('Choose a resolution up to 3840 × 2160 and a refresh rate from 60 to 240 Hz.')
         if self.aa not in AA_MODES or self.filtering not in FILTER_MODES:

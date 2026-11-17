@@ -8,6 +8,7 @@ import logging
 from .sources import child
 from .patches import apply_patch, portable_startup, SUPPORTED_HASHES, SUPPORTED_RUNTIME_HASHES
 from .video import CAMERA_ZOOMS,RENDER_LIMITS
+from .controller_prompts import PROMPT_STYLES
 
 
 def setup_portable(entry, original_hash):
@@ -59,6 +60,7 @@ def configure_bridge(entry,settings):
     config['Graphics']['SmoothInterpolation']='0'
     config['Graphics']['CameraZoom']=str(CAMERA_ZOOMS.index(settings.camera_zoom))
     config['Graphics']['XboxPrompts']=str(int(settings.xbox_prompts))
+    config['Graphics']['ControllerPromptFamily']=str(PROMPT_STYLES.index(settings.controller_prompt_style))
     config['Graphics']['TitleExtension']=str(int(settings.title_extension))
     config['Game']={'Language':getattr(settings,'language','English').upper()}
     config['Game']['Edition']='SOCCER' if settings.edition=='Soccer Mania' else 'FOOTBALL'
@@ -101,7 +103,36 @@ def read_live_settings(entry,settings):
         zoom=config.getint('Graphics','CameraZoom')
         if 0<=zoom<len(CAMERA_ZOOMS):values['camera_zoom']=CAMERA_ZOOMS[zoom]
     except (ValueError,configparser.Error):pass
+    try:
+        style=config.getint('Graphics','ControllerPromptFamily')
+        if 0<=style<len(PROMPT_STYLES):values['controller_prompt_style']=PROMPT_STYLES[style]
+    except (ValueError,configparser.Error):pass
     return replace(settings,**values)
+
+
+def write_live_prompt_style(entry, style):
+    """Change one INI key without replacing unrelated live panel preferences."""
+    index = PROMPT_STYLES.index(style)
+    path = Path(entry)/'opensoccermania.ini'
+    import os
+    if os.name == 'nt':
+        import ctypes as C
+        writer = C.WinDLL('kernel32', use_last_error=True).WritePrivateProfileStringW
+        writer.argtypes = [C.c_wchar_p, C.c_wchar_p, C.c_wchar_p, C.c_wchar_p]
+        writer.restype = C.c_int
+        if not writer('Graphics', 'ControllerPromptFamily', str(index), str(path.resolve())):
+            raise C.WinError(C.get_last_error())
+    else:
+        config = configparser.ConfigParser(interpolation=None)
+        if path.exists():
+            with path.open(encoding='ascii') as stream:
+                config.read_file(stream)
+        if not config.has_section('Graphics'):
+            config.add_section('Graphics')
+        config['Graphics']['ControllerPromptFamily'] = str(index)
+        out = io.StringIO(); config.write(out)
+        temporary = path.with_suffix('.prompt.tmp')
+        temporary.write_text(out.getvalue(), encoding='ascii'); temporary.replace(path)
 
 
 def install_input_bridge(entry, bridge):

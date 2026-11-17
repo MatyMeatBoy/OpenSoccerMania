@@ -48,7 +48,9 @@ def main():
             subprocess.run([str(compiler), '-std=c++17', '-O2', '-Wall', '-Wextra',
                             '-static', '-Wl,--image-base,0x400000',
                             '-Wl,--disable-dynamicbase',
-                            str(ROOT / f'tests/native_{name}.cpp'), '-lgdi32',
+                            str(ROOT / f'tests/native_{name}.cpp'),
+                            *([str(ROOT / 'build/native/branding.o')]
+                              if name == 'menu_background_render' else []), '-lgdi32',
                             '-ldxguid', '-ldinput8', '-lshell32', '-ladvapi32',
                             '-o', str(executable)], check=True)
             shutil.copy2(bridge, directory / 'd3d8.dll')
@@ -76,6 +78,8 @@ def main():
                 variants += [('--horizon',), ('--far-boundary',), ('--color-only',)]
             elif name == 'world_effects_render':
                 variants += [('--masked',)]
+            elif name == 'settings_render':
+                variants = [(str(family),) for family in range(1, 5)]
             elif name == 'clear_rect':
                 variants += [('--original-aspect',)]
             elif name == 'device_reset':
@@ -96,6 +100,15 @@ def main():
                 if code:
                     raise RuntimeError(f'GPU/native integration failed: {name} {variant}: {code}')
                 print(f'PASS {name} {" ".join(variant)}', flush=True)
+            if name == 'settings_render':
+                # Fixed 1920x1080 fixture: this rectangle contains only the
+                # footer's south glyph, excluding the family label and actions.
+                glyphs = []
+                for family in range(1, 5):
+                    with Image.open(directory / f'settings-family-{family}.bmp') as frame:
+                        glyphs.append(frame.crop((366, 910, 440, 985)).tobytes())
+                if len(set(glyphs)) != 4:
+                    raise RuntimeError('GPU footer did not display four distinct controller glyphs.')
         report['passed'] = True
     finally:
         (workspace / 'report.json').write_text(json.dumps(report, indent=2))

@@ -56,19 +56,46 @@ game selects its verified button profile. Its product label and four private
 GUIDs identify the OpenSoccerMania devices; it does not impersonate hardware
 outside this game's process.
 
+## Button styles
+
+Auto uses SDL's mapped controller type, with a name fallback for raw devices.
+Choose Xbox 360, PlayStation 4, Switch Pro or Steam Deck in launcher Controls /
+Graphics or the F1 panel to override the visual family. This changes hints only;
+input positions and separate player slots stay the same. The existing button
+hints on/off preference remains available.
+
+| Position | Xbox 360 | PlayStation 4 | Switch Pro | Steam Deck |
+| --- | --- | --- | --- | --- |
+| South: confirm / pass | A | Cross | B | A |
+| East: back / shoot | B | Circle | A | B |
+| West: long ball | X | Square | Y | X |
+| North: power-up | Y | Triangle | X | Y |
+| Pause | Start | Options | Plus | Menu |
+| Video skip | Back | Share | Minus | View |
+
+The pause and skip buttons together open F1 settings. Steam Input can expose a
+controller as XInput, concealing its original family; use the manual style in
+that case. Steam-family glyph detection is a display convention, not proof that
+the device is a Deck. Rear buttons, trackpads, Linux/Proton Gaming Mode and
+physical PS4/Switch/Deck devices still need their own acceptance.
+
+Glyphs come from [Xelu's CC0 prompt pack](https://thoseawesomeguys.com/prompts/).
+The selected originals, source hashes, license and deterministic native atlas
+are included in the public package.
+
 ## Runtime and integration
 
 `ControllerBridge(root, pid=None, log=None)` retains `start()`, `stop()`,
 `enabled`, `selected_id`, `devices`, `status`, `deadzone`, `mode` and
 `automatic_mode`. Device entries include `id`, `name`, `mapped`, and `slot`
-(1–4, or `None` beyond the limit). `selected_id` chooses settings navigation,
+(1â€“4, or `None` beyond the limit). `selected_id` chooses settings navigation,
 not a source to aggregate into gameplay. Every assigned pad is published.
 
 Recognized SDL gamepads use standardized positions. `raw_mapping` translates
 unrecognized joystick button indices into SDL positions; the default assumes a
 common Xbox raw layout. Raw hats and the first two axes also work. Nonstandard
 adapters require a matching raw profile; raw button numbering is not universal.
-The worker constrains the stick deadzone to 0.05–0.95.
+The worker constrains the stick deadzone to 0.05â€“0.95.
 
 The native proxy waits at most 300 ms for the SDL producer at initial discovery.
 If it is unavailable, the proxy preserves the original physical DirectInput
@@ -102,7 +129,7 @@ still expires after 500 ms without updates. Production SDL input never sets flag
 Pads: `Local\OpenSoccerMania-Pads-<pid>`, 160 bytes. Eight header DWORDs: magic
 `0x504d534f`, version 1, sequence, flags, four reserved. Flag 1 enables input;
 flag 2 selects match button layout. Four 32-byte slots follow: SDL instance ID,
-connected flag, signed X/Y in -32767…32767, standardized SDL button mask, and
+connected flag, signed X/Y in -32767â€¦32767, standardized SDL button mask, and
 three reserved DWORDs. Mask bits 15/16 represent left/right triggers. D-pad bits
 are absent because movement has already been resolved into X/Y. An absent slot
 is all zero. The native reader honors each device's requested data format and

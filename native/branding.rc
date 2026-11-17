@@ -1,1 +1,3 @@
 101 ICON "favicon.ico"
+
+102 RCDATA "controller_prompts.bin"

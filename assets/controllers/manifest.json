@@ -1,0 +1,272 @@
+{
+  "author": "Nicolae (Xelu) Berbece / Those Awesome Guys",
+  "updated_by": "Paul Paun (2021), as credited on upstream page",
+  "license": "CC0-1.0",
+  "source_page": "https://thoseawesomeguys.com/prompts/",
+  "source_archive": "https://thoseawesomeguys.com/prompts/Xelu_Free_Controller%26Key_Prompts.zip",
+  "archive_sha256": "2848fd4259437a6f594f81ff8d8d7a1f922397c7e9da163b2535aa82ae1df037",
+  "readme_upstream_sha256": "60582d02b4cdc1c6a16ea3c720b771145838ce8b89b7df5c5a2295cc85faa658",
+  "files": [
+    {
+      "path": "assets/controllers/xbox360/south.png",
+      "upstream_member": "Others/Xbox 360/360_A.png",
+      "sha256": "6d8769aacff836a1edd5dbbb7f4ee7c3652b21509bd286ae77989ad1cf39952d"
+    },
+    {
+      "path": "assets/controllers/xbox360/east.png",
+      "upstream_member": "Others/Xbox 360/360_B.png",
+      "sha256": "8e100cd5aa094f96e70a024eec4433e85cc2b28fd6e91fa559fb12843602ba8b"
+    },
+    {
+      "path": "assets/controllers/xbox360/west.png",
+      "upstream_member": "Others/Xbox 360/360_X.png",
+      "sha256": "e7b5a8beb263f1e75b48c64ba57ffe002ab1b619a57cbd915f68af130c071559"
+    },
+    {
+      "path": "assets/controllers/xbox360/north.png",
+      "upstream_member": "Others/Xbox 360/360_Y.png",
+      "sha256": "4da30c178e91381a3b6f7cc32be405b10a2824afc514fb12db633813e6f1639b"
+    },
+    {
+      "path": "assets/controllers/xbox360/left_shoulder.png",
+      "upstream_member": "Others/Xbox 360/360_LB.png",
+      "sha256": "c9719656a1b8760a5a87f49ae7659c4a48693081a842c0cb98efb2a1a13a1d61"
+    },
+    {
+      "path": "assets/controllers/xbox360/right_shoulder.png",
+      "upstream_member": "Others/Xbox 360/360_RB.png",
+      "sha256": "80b80b7ad1ea47e9ebd1e949f677a3a55207d47a5ca8e04e39ec20c621f6e1be"
+    },
+    {
+      "path": "assets/controllers/xbox360/left_trigger.png",
+      "upstream_member": "Others/Xbox 360/360_LT.png",
+      "sha256": "e14dada352ffecd159a52cc71114a4f03d302a49ae0df61eb22e14a46dbe5afd"
+    },
+    {
+      "path": "assets/controllers/xbox360/right_trigger.png",
+      "upstream_member": "Others/Xbox 360/360_RT.png",
+      "sha256": "eaf45a76984c0040cb8c1e4a49769d1be9c2d9c2346ed8c32b19b5c262f60ece"
+    },
+    {
+      "path": "assets/controllers/xbox360/back.png",
+      "upstream_member": "Others/Xbox 360/360_Back.png",
+      "sha256": "debfb7168db68efee2fb5d44f932bcecd6cc2660b61a53df6c845ceb90c60fe5"
+    },
+    {
+      "path": "assets/controllers/xbox360/start.png",
+      "upstream_member": "Others/Xbox 360/360_Start.png",
+      "sha256": "36b5f2a0ca036d2947332440a5054d6cbf5d506c311dfb75b3a4687f1580e8d4"
+    },
+    {
+      "path": "assets/controllers/xbox360/left_stick.png",
+      "upstream_member": "Others/Xbox 360/360_Left_Stick_Click.png",
+      "sha256": "cd547792c18ee2378f3d56534815a838875fe49264c33e3a345ac20e91b5c7a3"
+    },
+    {
+      "path": "assets/controllers/xbox360/right_stick.png",
+      "upstream_member": "Others/Xbox 360/360_Right_Stick_Click.png",
+      "sha256": "1c489382176dda92290c7c5fe71c65cc5aada7d2e4244bd68b9bc7d83ddfef94"
+    },
+    {
+      "path": "assets/controllers/xbox360/dpad.png",
+      "upstream_member": "Others/Xbox 360/360_Dpad.png",
+      "sha256": "39e73e773a25d65cf5034c0b6c9d7be35a8013aba8f217436270084317234cfe"
+    },
+    {
+      "path": "assets/controllers/ps4/south.png",
+      "upstream_member": "Others/PS4/PS4_Cross.png",
+      "sha256": "ede2f1148b13263d5674d0a215ff7de52a1c5c983c0c3d713c0f8b62c3b5f8d6"
+    },
+    {
+      "path": "assets/controllers/ps4/east.png",
+      "upstream_member": "Others/PS4/PS4_Circle.png",
+      "sha256": "068c1b4708af7f04b6d2cdee172b19cd0f6645ddc8777acd75c856cc431abb0e"
+    },
+    {
+      "path": "assets/controllers/ps4/west.png",
+      "upstream_member": "Others/PS4/PS4_Square.png",
+      "sha256": "5beb5e38d0e52b2c0c4b1ec27c3ca3e2801504216c8039f28bf6821aab91ca72"
+    },
+    {
+      "path": "assets/controllers/ps4/north.png",
+      "upstream_member": "Others/PS4/PS4_Triangle.png",
+      "sha256": "c44fc913b73602460a384aaad9a7be7cfadb657a2361556349cef584aa189528"
+    },
+    {
+      "path": "assets/controllers/ps4/left_shoulder.png",
+      "upstream_member": "Others/PS4/PS4_L1.png",
+      "sha256": "a5e84f0757120a016a6edbc907134a0cd10ba81e5eb9f59f74cd7d9b77084272"
+    },
+    {
+      "path": "assets/controllers/ps4/right_shoulder.png",
+      "upstream_member": "Others/PS4/PS4_R1.png",
+      "sha256": "97526f2d4976d77337b58b8a274fff107521c794484c03fd436aa4899eaf6c71"
+    },
+    {
+      "path": "assets/controllers/ps4/left_trigger.png",
+      "upstream_member": "Others/PS4/PS4_L2.png",
+      "sha256": "50278dfe0e35c1c471dfc9f4ca06477e86c98591c0732733b926b1b7c0d21831"
+    },
+    {
+      "path": "assets/controllers/ps4/right_trigger.png",
+      "upstream_member": "Others/PS4/PS4_R2.png",
+      "sha256": "3da0c072c00b9581f609803fe338658ae26d593e5da3465f3ac7fdc05f1c535e"
+    },
+    {
+      "path": "assets/controllers/ps4/back.png",
+      "upstream_member": "Others/PS4/PS4_Share.png",
+      "sha256": "97ffb691a8a404ca13b459be473f1e156fba91adcf95814b868a4b00e266cf51"
+    },
+    {
+      "path": "assets/controllers/ps4/start.png",
+      "upstream_member": "Others/PS4/PS4_Options.png",
+      "sha256": "ac1ea6ffc3c8e8cedf95af3f875ca02b8a05ba0d733b57ef908fe6ec2ad84020"
+    },
+    {
+      "path": "assets/controllers/ps4/left_stick.png",
+      "upstream_member": "Others/PS4/PS4_Left_Stick_Click.png",
+      "sha256": "75b179832b2014d181d3327a5b201adc1d96bf10fa93639dd57a88b73392c7b8"
+    },
+    {
+      "path": "assets/controllers/ps4/right_stick.png",
+      "upstream_member": "Others/PS4/PS4_Right_Stick_Click.png",
+      "sha256": "347597a28e87c850618074423cbbb592793e5b78fdc58a66d4f2471ca2c55f88"
+    },
+    {
+      "path": "assets/controllers/ps4/dpad.png",
+      "upstream_member": "Others/PS4/PS4_Dpad.png",
+      "sha256": "3c549f2fda13136b9c641aa7469548d4bb28fc7b03de59a002300826f263f8e8"
+    },
+    {
+      "path": "assets/controllers/switch_pro/south.png",
+      "upstream_member": "Switch/Switch_B.png",
+      "sha256": "f41fd9a72787acf40e9ba2c0a741a236c439000db45b0e41eff6929103606a5b"
+    },
+    {
+      "path": "assets/controllers/switch_pro/east.png",
+      "upstream_member": "Switch/Switch_A.png",
+      "sha256": "de84db5539a123165dbd497a2dc5a0a4b4994b52a038776d781c52293e9b323f"
+    },
+    {
+      "path": "assets/controllers/switch_pro/west.png",
+      "upstream_member": "Switch/Switch_Y.png",
+      "sha256": "81102d3f7f717d1fdbcd128f99af3af28e0d7c6268b584bd645b83c0ff8c226a"
+    },
+    {
+      "path": "assets/controllers/switch_pro/north.png",
+      "upstream_member": "Switch/Switch_X.png",
+      "sha256": "e244cd25e59dc5ccc72be582156218b2811dea7bcd8276ba3d2f547bc13d931a"
+    },
+    {
+      "path": "assets/controllers/switch_pro/left_shoulder.png",
+      "upstream_member": "Switch/Switch_LB.png",
+      "sha256": "fe92dea776278dca97c1a9463494c28f78a700f66bba92f4fb8a4a0d34203eef"
+    },
+    {
+      "path": "assets/controllers/switch_pro/right_shoulder.png",
+      "upstream_member": "Switch/Switch_RB.png",
+      "sha256": "5c6403d2192cbe6858caebb2c464a987e5ae04d04883fc6fa1cf4e885ce64dde"
+    },
+    {
+      "path": "assets/controllers/switch_pro/left_trigger.png",
+      "upstream_member": "Switch/Switch_LT.png",
+      "sha256": "711c04150b6302fa18eaa4b3f76f104da10d52c1e98d77187190bf3a8c6b9bd5"
+    },
+    {
+      "path": "assets/controllers/switch_pro/right_trigger.png",
+      "upstream_member": "Switch/Switch_RT.png",
+      "sha256": "23a5b6967c6d0b8ed4000410d87eba4bd1c9102a14fb1e6961c48df7dca3be13"
+    },
+    {
+      "path": "assets/controllers/switch_pro/back.png",
+      "upstream_member": "Switch/Switch_Minus.png",
+      "sha256": "524f925938bae09a4277b9618d865c8479c740ba43805f92b4341c1e96e01b58"
+    },
+    {
+      "path": "assets/controllers/switch_pro/start.png",
+      "upstream_member": "Switch/Switch_Plus.png",
+      "sha256": "0569561db9ca68a95d50a1087197050a38da5d1941769de3dd92ec04a0142be6"
+    },
+    {
+      "path": "assets/controllers/switch_pro/left_stick.png",
+      "upstream_member": "Switch/Switch_Left_Stick_Click.png",
+      "sha256": "8367d5673f40b73662920051b5321d9415b9d0cbdc1806415020a26328b99576"
+    },
+    {
+      "path": "assets/controllers/switch_pro/right_stick.png",
+      "upstream_member": "Switch/Switch_Right_Stick_Click.png",
+      "sha256": "6eae670481d6bd9ab091ba8d273efb21cdf0c38b3cc2438779cf05bd41ac653a"
+    },
+    {
+      "path": "assets/controllers/switch_pro/dpad.png",
+      "upstream_member": "Switch/Switch_Dpad.png",
+      "sha256": "b0f31fc03d7d22f8a6e26719ea5ae77206d5d91c7e7051d5cf76bf66fa8891e4"
+    },
+    {
+      "path": "assets/controllers/steam_deck/south.png",
+      "upstream_member": "Steam Deck/SteamDeck_A.png",
+      "sha256": "b48f2af29670ce222cfa759a22ca7d789a10cd8a7a15a6e9c2897fb1df7ed936"
+    },
+    {
+      "path": "assets/controllers/steam_deck/east.png",
+      "upstream_member": "Steam Deck/SteamDeck_B.png",
+      "sha256": "63c72d44c4cce55d6ec5e1368938533f9a4ed440f9d1ce7f7e42eb6d9fd77db5"
+    },
+    {
+      "path": "assets/controllers/steam_deck/west.png",
+      "upstream_member": "Steam Deck/SteamDeck_X.png",
+      "sha256": "3cf9db71d7f487cfb0369d5a117ea1cad299a851b334f0e39c62c1043efc8aba"
+    },
+    {
+      "path": "assets/controllers/steam_deck/north.png",
+      "upstream_member": "Steam Deck/SteamDeck_Y.png",
+      "sha256": "725c618d802850b28d1f79631cbe9be006306461e5a3e4b36297d05ab02fd7f1"
+    },
+    {
+      "path": "assets/controllers/steam_deck/left_shoulder.png",
+      "upstream_member": "Steam Deck/SteamDeck_L1.png",
+      "sha256": "c2525c8cb3ca2123283b49ddbdb4c1440cd6467c92859124cc7e89ed65b88ef3"
+    },
+    {
+      "path": "assets/controllers/steam_deck/right_shoulder.png",
+      "upstream_member": "Steam Deck/SteamDeck_R1.png",
+      "sha256": "57bd1669d1ab589185cf981faf7f8a2e6ecc4107b9914cb2332f9abe95bac0da"
+    },
+    {
+      "path": "assets/controllers/steam_deck/left_trigger.png",
+      "upstream_member": "Steam Deck/SteamDeck_L2.png",
+      "sha256": "34fb5d778d99b024a596b87ddc5ad806fd70dbaf4f9a745304db9d4c54a4a62a"
+    },
+    {
+      "path": "assets/controllers/steam_deck/right_trigger.png",
+      "upstream_member": "Steam Deck/SteamDeck_R2.png",
+      "sha256": "f772465db2802c2bf62f5050dbc688e1999badd4485d0f46253bfef8add35987"
+    },
+    {
+      "path": "assets/controllers/steam_deck/back.png",
+      "upstream_member": "Steam Deck/SteamDeck_Inventory.png",
+      "sha256": "18409dcdc4e4361dac782227f39a69bdf24e5b6d3c76df7c8ed1937597712a1b"
+    },
+    {
+      "path": "assets/controllers/steam_deck/start.png",
+      "upstream_member": "Steam Deck/SteamDeck_Menu.png",
+      "sha256": "4879fd17cd362d51a37d8dab107554d1f0d6d9e406b1318e7f95484242b7929c"
+    },
+    {
+      "path": "assets/controllers/steam_deck/left_stick.png",
+      "upstream_member": "Steam Deck/SteamDeck_Left_Stick_Click.png",
+      "sha256": "d026c92c49e599a6ce20d40788ecbe6770c39b20eafbd3c92adfcc3bf88ce121"
+    },
+    {
+      "path": "assets/controllers/steam_deck/right_stick.png",
+      "upstream_member": "Steam Deck/SteamDeck_Right_Stick_Click.png",
+      "sha256": "a75270a2566fbaf026c8e4f99dd51256ef115ce21ef429193f6503f308e1fb42"
+    },
+    {
+      "path": "assets/controllers/steam_deck/dpad.png",
+      "upstream_member": "Steam Deck/SteamDeck_Dpad.png",
+      "sha256": "9d90988807f9e1d44ca644f8bb132d11569b2306928942f7a09c4dbcb4b45e6b"
+    }
+  ],
+  "positions": "SDL south/east/west/north; Switch labels B/A/Y/X. Source PNGs unchanged."
+}
