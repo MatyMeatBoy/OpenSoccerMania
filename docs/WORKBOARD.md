@@ -1,7 +1,19 @@
 # OpenSoccerMania work board
 
-Updated: 2026-11-17. Current published baseline: 0.1.0-pre.9. See
+Updated: 2026-11-18. Current published baseline: 0.1.0-pre.9. See
 [pre.9 scope and limits](releases/0.1.0-pre.9.md).
+
+## Inline random-state follow-up, 2026-11-18
+
+- Verified three original inline-RNG routines in a private relocated-instruction
+  fixture: 2096 integer, 1572 float and 262 color cases pass; corrupting the
+  integer multiplier produces the expected failure. A concrete consumer selects
+  particle colors. Other consumers are not thereby classified as presentation.
+- Identified two random-derived vector tables with separate wrap cursors, so
+  comparing only the seed omits additional state needing classification.
+  Initial table equality, complete consumers and authoritative influence remain
+  open. Production input/seeds/scheduler and accepted pre.9 artifacts are
+  unchanged. See [inline generator evidence](network-random-state.md#follow-up-inline-generator-and-particle-color-path).
 
 ## Pre.9 validation baseline, 2026-11-17
 

@@ -65,3 +65,75 @@ The adapter must compare agreed logical-state checksums in controlled identical
 setups, verify input/snapshot ownership and scheduler behavior while waiting,
 and implement divergence handling or host authority. Playable synchronized
 online matches remain unimplemented.
+
+## Follow-up: inline generator and particle-color path
+
+Fresh inspection and a private instruction-level fixture refine the second
+generator at `0x6276e8`. Its integer routine `0x452f30` uses the same unsigned
+LCG constants as the shared generator, but reads/writes this distinct state.
+Bound zero still advances it. Float routine `0x452f70` multiplies the remainder
+by its float argument and the original stored scale; it does not call the
+shared getter/setter. This is static state ownership plus bounded arithmetic
+verification, not proof that the two subsystems can be synchronized independently.
+
+Routine `0x452dd0` advances the inline state and selects one of six ARGB values
+at `0x5acd7c`: red, green, blue, yellow, magenta and cyan. Its caller at
+`0x45eb61` consumes the result with alpha/RGB masks. The inspected surrounding
+initialization also names a ParticleSystem/Particle Flush path. This resolves
+a concrete color-selection consumer; it does **not** classify every consumer
+of the inline generator as decorative or safe to exclude from logical state.
+
+There are 51 encoded direct-call candidates for the integer routine, 97 for the
+float routine and two for the color selector in the inspected linear `.text`
+disassembly. Each selected E8 encoding/relative destination matches the exact
+supported executable bytes. These are static candidates, not runtime counts,
+complete indirect-call coverage or an authoritative-state classification.
+
+### Bounded original-instruction checks
+
+The private fixture verifies the entire input executable's supported SHA-256,
+then copies only the three pure routines above into its own executable pages.
+Eight documented absolute state/constant address operands are relocated to
+fixture storage; all other instruction bytes and local branches are preserved.
+It calls no game entrypoint, constructors, imports or full update. Original
+content and copied code remain private.
+
+Across 262 explicit/generated seeds, the fixture checks 2096 integer cases,
+1572 float cases and 262 color cases. This includes unsigned wrap, zero/large
+bounds and zero/positive/negative float factors. All pass. A one-ULP float
+tolerance was declared before execution; maximum observed difference is zero
+in the recorded x87 environment. No cross-platform/precision guarantee follows.
+A deliberately corrupted integer multiplier makes the same fixture fail as
+expected. Both isolated processes preserve the input desktop.
+
+An earlier whole-image mapping attempt was excluded after the fixture's desired
+address range was already occupied. That observation is a fixture limitation,
+not a game crash or evidence about the replay failure. The final fixture uses
+relocated function copies and records its source/binary hashes separately.
+
+### Random-derived tables and cursors
+
+The inspected initialization calls `0x452ae0` before the time-derived seed store
+at `0x452044`. Its loops build two vector tables. Fresh inspection of the called
+transform confirms three float outputs; the static store ranges and consumer
+strides/wrap points agree:
+
+| Table span, end exclusive | Layout | Consumer cursor |
+| --- | --- | --- |
+| `0x626898..0x6271f8` | 200 records × 12 bytes | `0x6271f8`, wraps at 200 |
+| `0x6271fc..0x6276ac` | 100 records × 12 bytes | `0x6276ac`, wraps at 100 |
+
+Consumers `0x452c60/0x452cb0` and `0x452d20/0x452d70` copy entries and advance
+the corresponding cursors. Thus a seed value alone does not describe these
+random-derived tables and their current positions. Initial contents, other
+writers and gameplay influence remain unverified. They must be classified
+before deciding whether they belong to authoritative state; visual caches must
+not automatically be added to a network contract merely because they differ.
+
+No production seed, input, snapshot or scheduler behavior changes. No bytes are
+masked, no whole-state equivalence is accepted, and online gameplay remains
+unimplemented. The next investigation can target the remaining consumers and
+table/cursor ownership rather than treating every inline-RNG difference as
+proven gameplay divergence. Private evidence is under
+`local/netplay-inline-rng-2026-11-18/`: `verification.json`,
+`consumer-inventory.json`, `lookup-ranges.json` and fresh instruction inspection.
