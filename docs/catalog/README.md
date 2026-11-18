@@ -1,6 +1,6 @@
 # OpenSoccerMania
 
-**LEGO Soccer Mania / Football Mania · MatyMeatBoy · Windows x64 · 0.1.0-pre.8**
+**LEGO Soccer Mania / Football Mania · MatyMeatBoy · Windows x64 · 0.1.0-pre.9**
 
 <img src="icon.png" width="180" alt="OpenSoccerMania project icon">
 
@@ -14,7 +14,7 @@ This is an experimental prerelease. Complete campaign/tournament coverage, long-
 
 ## Install
 
-[Development release](https://github.com/MatyMeatBoy/OpenSoccerMania/releases/tag/v0.1.0-pre.8)
+[Development release](https://github.com/MatyMeatBoy/OpenSoccerMania/releases/tag/v0.1.0-pre.9)
 
 Your own supported Windows copy of LEGO Soccer Mania / Football Mania, as an installed folder or supported disc image.
 
