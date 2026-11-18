@@ -3,6 +3,9 @@
 Updated: 2026-11-18. Current published baseline: 0.1.0-pre.9. See
 [pre.9 scope and limits](releases/0.1.0-pre.9.md).
 
+For continued online work, start with the [online handoff](ONLINE_HANDOFF.md):
+current implementation, exact engine boundaries, private evidence and next steps.
+
 ## Inline random-state follow-up, 2026-11-18
 
 - Verified three original inline-RNG routines in a private relocated-instruction
