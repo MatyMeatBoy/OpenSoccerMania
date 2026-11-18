@@ -1,7 +1,35 @@
 # OpenSoccerMania work board
 
-Updated: 2026-11-17. Current published baseline: 0.1.0-pre.8. See
-[pre.8 scope and limits](releases/0.1.0-pre.8.md).
+Updated: 2026-11-17. Current published baseline: 0.1.0-pre.9. See
+[pre.9 scope and limits](releases/0.1.0-pre.9.md).
+
+## Pre.9 validation baseline, 2026-11-17
+
+- Published [pre.9](https://github.com/MatyMeatBoy/OpenSoccerMania/releases/tag/v0.1.0-pre.9)
+  from exact source/tag `e8c340d2ccecc64901009160b04cb9975d4630bf`.
+  CI 44211253284 passes. Source ZIP has 310 inventoried members, SHA-256
+  `a4bec9efbfcaf229641ea1ba030469cce41ff3f78037038104abf4dc9b4f0fc3`;
+  Windows ZIP has 1089 members, SHA-256
+  `5351ce85385cbbbfc0a6bd4ecacb743469bc1ee7cc56d261fe9892684e5078d5`.
+  All four public asset downloads match their local files and GitHub digests.
+- Corrected the source owner-game probe's ignored render-cap argument and
+  unsupported advertised 50 cap. CLI options share VideoSettings' limit list.
+  A real help/constructor regression fails before that latter correction and
+  passes afterward. Cleanup records owned-window WM_CLOSE delivery and normal
+  exit without substituting WM_QUIT. This is a tooling/validation baseline,
+  not a newly established fix for the original intermittent black replay.
+- Source passes 149 Python tests (one privilege skip), 22 named native checks
+  and 31 GPU/input/import cases against exact frozen bridge
+  `27c382f932ec46cce90ed3a56b35a2eae730da5f9f8ff22759d4275f9dcfa99f`.
+  Extracted source passes 149 tests (two environment/owner-data skips); extracted
+  frozen UI/import/resources and all four family previews pass. A real standard
+  token under NTFS install write denial verifies per-user fallback, both icons,
+  clean exit and restored test ACLs. A fresh owner-game process also verifies
+  cap configuration and clean close with that exact packaged DLL.
+- Preserved all 1088 files of the accepted pre.8 portable tree with matching
+  hashes at `build/released-pre8/OpenSoccerMania/`; its published tag/assets
+  remain intact. Receipts for pre.9 stay under
+  `local/release-verification/pre9-build/`. Full pending scope remains below.
 
 ## Catalog submissions and public visibility, 2026-11-17
 

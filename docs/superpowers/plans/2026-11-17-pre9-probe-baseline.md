@@ -20,7 +20,7 @@ the repository's checked source/portable ZIP packagers.
 - [x] Run the same owner-game control with 60 and 120, checking generated INI,
   native startup log and clean exit; keep logical Hz unchanged.
 - [x] Review the focused code change and update release notes/version to pre.9.
-- [ ] Preserve pre.8, rebuild/freeze and verify Python/native/GPU checks against
+- [x] Preserve pre.8, rebuild/freeze and verify Python/native/GPU checks against
   the exact packaged binaries. Verify extracted source, frozen UI/import and
   standard-user storage before publishing immutable pre.9 assets and hashes.
 
@@ -42,3 +42,9 @@ after deriving choices from the shared limit list. Final source checks pass
 149 Python tests (one privilege skip), 22 native cases and 31 GPU/input/import
 cases against the exact frozen bridge. Frozen UI/import/resources and actual
 nonadministrator NTFS-denial startup pass, including restored fixture ACLs.
+
+Published immutable pre.9 from `e8c340d2ccecc64901009160b04cb9975d4630bf`.
+Both ZIP inventories verify, extracted source passes 149 tests (two expected
+environment/owner-data skips), extracted frozen smoke passes, CI 44211253284
+passes and all four public asset downloads match local bytes/server digests.
+Earlier pre.8 portable files and accepted release artifacts are preserved.
