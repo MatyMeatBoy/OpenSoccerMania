@@ -79,6 +79,17 @@ Updated: 2026-11-17. Current published baseline: 0.1.0-pre.8. See
 
 ## Continuation verification, 2026-11-17
 
+- A pre.8 pirate-ship-field probe reaches a visible goal replay, returns to
+  kickoff and continues gameplay through window resizing. All 42 saved images
+  retain visible output, but cleanup requires forced termination: this is not a
+  clean full-run pass or a universal fix for the old black replay. Separate
+  menu and active-match controls close with WM_CLOSE alone and exit zero;
+  the latter does not reproduce the original replay/resize sequence or starting
+  profile. Static inspection also
+  corrects the interpretation of legacy trace column `paused`: it is a fader
+  presentation latch, not gameplay pause. See
+  [replay/shutdown follow-up](replay-transition-pre8.md).
+
 - Identified concrete writers for the two differing conditional bytes: the
   initializer copies the low byte of an address argument, while a reset copies
   saved incoming ECX. A new phase-verified Friendly run captures matching
