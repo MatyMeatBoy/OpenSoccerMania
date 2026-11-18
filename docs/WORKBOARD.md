@@ -79,6 +79,14 @@ Updated: 2026-11-17. Current published baseline: 0.1.0-pre.8. See
 
 ## Continuation verification, 2026-11-17
 
+- A same-profile/INI pre.8 follow-up verifies the actual client dimensions and
+  minimized/restored states on the private desktop, reaches halftime and the
+  second half, and captures a later visible replay. WM_CLOSE alone exits zero
+  in 0.297 seconds with all three copied saves unchanged. Quick Start chooses
+  the ice field rather than the failed pirate scene, and the later replay's
+  return to gameplay is not observed; exact reproduction and original cause
+  remain open. See [same-profile control](replay-transition-pre8.md#same-profile-window-cycle-control).
+
 - A pre.8 pirate-ship-field probe reaches a visible goal replay, returns to
   kickoff and continues gameplay through window resizing. All 42 saved images
   retain visible output, but cleanup requires forced termination: this is not a

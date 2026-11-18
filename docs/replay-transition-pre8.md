@@ -63,3 +63,41 @@ recorded. Its legacy shutdown output includes a negative `MEM LOST IN FE`
 diagnostic and reference-node messages; exit zero does not establish leak freedom.
 
 Private evidence: `local/acceptance-2026-11-17/exit-match-control-pre8/`.
+
+## Same-profile window-cycle control
+
+A 435-second follow-up uses the same three initial profile-file hashes and
+effective INI values as the failed long run, with the exact same pre.8 bridge.
+Quick Start nevertheless chooses Shipshape Shipmates versus Western Cowboys
+on the ice field. Equal profile/configuration and timed keys do not establish
+an identical scene or simulation: this is not the original pirate-ship failure
+reproduction. A future paired reproduction needs explicit teams/map selection
+and verified transition checkpoints instead of assuming Quick Start repeats.
+
+Unlike the earlier requested-only minimize observation, this probe independently
+enumerates the private test desktop and verifies the owned SD Window after each
+action: client 1280×540; minimized state true; restored state false; client
+800×600; client 960×540. The observed window retains the same handle and UI
+thread through the sequence. No input desktop switch or global input is used.
+Enumerating the thread's windows from the observing desktop returned an empty
+list even while the game was running; enumeration of the actual private desktop
+finds it. An empty observation from the wrong desktop is not proof of no window.
+
+The run reaches 0–0 halftime statistics, then the SECOND HALF overlay after
+Continue at 370.078 seconds. Capture 390 shows resumed gameplay; capture 420
+shows a visible low-angle replay with its Continue prompt, sky and goal net.
+The probe does not observe Continue out of that later replay, a completed
+match, or the earlier pirate-field post-replay sequence.
+
+At its deadline, WM_CLOSE is successfully posted to the recorded SD Window.
+The process exits 0 in 0.297 seconds, without WM_QUIT or forced termination.
+All three copied profile-file hashes and the input desktop remain unchanged.
+All 19 saved images contain visible output under the same sampled darkness
+check. This adds a clean close after a verified window cycle and a later replay
+view; it does not identify or repair the original failure. No production change
+or new release is implied. The same legacy negative memory/reference-node
+shutdown diagnostics appear; leak freedom remains unproven.
+
+Private evidence: `local/acceptance-2026-11-17/replay-close-control-pre8/`,
+especially `summary.json`, `comparison-scope.json`, `window-observations.json`,
+`close-receipt.json` and the unaltered scene captures.
