@@ -79,6 +79,13 @@ Updated: 2026-11-17. Current published baseline: 0.1.0-pre.8. See
 
 ## Continuation verification, 2026-11-17
 
+- A new Friendly selection probe fixes LEGO All Stars / Lawbringers and Western
+  Junction through verified menu phases. This profile exposes only Western
+  Junction and City Park in that selector; the desired pirate field cannot be
+  assumed selectable. The stopped run closes cleanly with copied saves unchanged,
+  but does not reach a goal/replay checkpoint and is excluded from replay
+  acceptance. Evidence: `local/acceptance-2026-11-17/friendly-pirate-pre8/summary.json`.
+
 - A same-profile/INI pre.8 follow-up verifies the actual client dimensions and
   minimized/restored states on the private desktop, reaches halftime and the
   second half, and captures a later visible replay. WM_CLOSE alone exits zero
